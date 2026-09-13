@@ -226,7 +226,9 @@ resource backendApp 'Microsoft.App/containerApps@2024-03-01' = {
 }
 
 // Async worker — same image, runs the Service Bus consumer instead of uvicorn.
-// No ingress; scales on its own (add KEDA queue-length scaling as needed).
+// No ingress. Scales on queue depth via a KEDA Azure Service Bus scaler that
+// authenticates with the same user-assigned managed identity (keyless), so it
+// scales to zero when idle and out under load.
 resource workerApp 'Microsoft.App/containerApps@2024-03-01' = {
   name: '${namePrefix}-worker'
   location: location
@@ -250,7 +252,24 @@ resource workerApp 'Microsoft.App/containerApps@2024-03-01' = {
           env: commonAppEnv
         }
       ]
-      scale: { minReplicas: 1, maxReplicas: 5 }
+      scale: {
+        minReplicas: 0
+        maxReplicas: 5
+        rules: [
+          {
+            name: 'servicebus-queue-depth'
+            custom: {
+              type: 'azure-servicebus'
+              identity: identity.id
+              metadata: {
+                namespace: serviceBus.name
+                queueName: 'analysis-jobs'
+                messageCount: '1'
+              }
+            }
+          }
+        ]
+      }
     }
   }
   dependsOn: [ raOpenAi, raServiceBus, raCosmos ]
