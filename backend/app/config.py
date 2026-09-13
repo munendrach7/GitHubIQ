@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     azure_openai_api_key: str = ""
     azure_openai_api_version: str = "2024-10-21"
     azure_openai_deployment: str = "gpt-4.1"
+    # Low-cost / fast model used for adhoc low-reasoning work: chunk summarisation
+    # and context compaction. Falls back to the main deployment if left blank.
+    azure_openai_deployment_mini: str = "gpt-4.1-mini"
 
     # Cosmos DB
     cosmos_endpoint: str = ""
@@ -56,9 +59,9 @@ class Settings(BaseSettings):
     rate_limit_window_hours: float = 4.0
     rate_limit_max_attempts: int = 1
 
-    # Analysis limits (keep the MVP fast and cheap)
-    max_files_scanned: int = 400
-    max_file_bytes: int = 60_000
+    # Analysis limits (balance depth of captured context with speed/cost)
+    max_files_scanned: int = 600
+    max_file_bytes: int = 120_000
 
     @property
     def admin_password_hash(self) -> str:
@@ -71,6 +74,11 @@ class Settings(BaseSettings):
     @property
     def llm_configured(self) -> bool:
         return bool(self.azure_openai_endpoint and self.azure_openai_api_key)
+
+    @property
+    def mini_deployment(self) -> str:
+        """Deployment name for the cheap compaction model (falls back to main)."""
+        return self.azure_openai_deployment_mini or self.azure_openai_deployment
 
     @property
     def cosmos_configured(self) -> bool:

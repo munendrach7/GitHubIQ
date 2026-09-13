@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from ..llm import invoke_json
+from ..compaction import compact_files
 from ..models import Architecture, ServiceEdge, ServiceNode
 from ..prompts import render
 from .state import GraphState
@@ -54,9 +55,13 @@ def run(state: GraphState) -> dict:
         f"- {c.id}: {c.name} [{c.kind}] path={c.path} tech={', '.join(c.tech)} — {c.responsibility}"
         for c in brief.components
     )
-    sources = ctx.read_files(
-        brief.file_assignments.get("architect", []), total_budget=110_000
-    )
+    sources = compact_files(
+        ctx,
+        brief.file_assignments.get("architect", []),
+        budget=240_000,
+        focus="how services/modules wire together: entry points, app/server setup, "
+        "routers, dependency injection, inter-component calls and configuration",
+    ) or ctx.sampled_sources(12)
     prompt = render(
         "architect_user",
         owner=ctx.meta.owner,

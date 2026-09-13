@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from ..llm import invoke_json
+from ..compaction import compact_files
 from ..models import Sandbox, ScreenElement, WalkthroughScreen
 from .state import GraphState
 
@@ -51,8 +52,12 @@ def run(state: GraphState) -> dict:
     reporter.update("Walkthrough", "running", "Visualising the app's main screens")
 
     fallback = _heuristic(ctx, brief, arch)
-    sources = ctx.read_files(
-        brief.file_assignments.get("walkthrough", []), total_budget=60_000
+    sources = compact_files(
+        ctx,
+        brief.file_assignments.get("walkthrough", []),
+        budget=140_000,
+        focus="the app's user-facing surfaces: UI screens, routes/endpoints, "
+        "commands and what the user does on each",
     ) or ctx.sampled_sources(10)
     flow_desc = "\n".join(f"{s.index}. {s.actor}: {s.label}" for s in flow.steps)
     prompt = (

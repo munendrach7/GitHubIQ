@@ -28,6 +28,22 @@ def get_llm():
     A new client per call avoids any shared-state races when the specialist
     agents invoke the model concurrently (LangGraph fan-out).
     """
+    return _build_llm(json_mode=True, max_tokens=32000, temperature=0.2)
+
+
+def _build_llm(
+    *,
+    deployment: Optional[str] = None,
+    json_mode: bool = True,
+    max_tokens: int = 32000,
+    temperature: float = 0.2,
+):
+    """Construct an AzureChatOpenAI client for a given deployment, or ``None``.
+
+    ``deployment`` defaults to the main reasoning model. Pass the mini deployment
+    (see :func:`get_compaction_llm`) for cheap, low-reasoning work. ``json_mode``
+    forces a JSON object response; disable it for free-form text (summaries).
+    """
     settings = get_settings()
     if not settings.llm_configured:
         logger.warning("Azure OpenAI not configured — agents run in heuristic mode.")
@@ -35,17 +51,29 @@ def get_llm():
 
     from langchain_openai import AzureChatOpenAI
 
-    return AzureChatOpenAI(
+    kwargs: dict[str, Any] = dict(
         azure_endpoint=settings.azure_openai_endpoint,
         api_key=settings.azure_openai_api_key,
         api_version=settings.azure_openai_api_version,
-        azure_deployment=settings.azure_openai_deployment,
-        temperature=0.2,
-        max_tokens=32000,
+        azure_deployment=deployment or settings.azure_openai_deployment,
+        temperature=temperature,
+        max_tokens=max_tokens,
         timeout=180,
         max_retries=3,
+    )
+    if json_mode:
         # Force valid JSON so richer prompts never break parsing.
-        model_kwargs={"response_format": {"type": "json_object"}},
+        kwargs["model_kwargs"] = {"response_format": {"type": "json_object"}}
+    return AzureChatOpenAI(**kwargs)
+
+
+def get_compaction_llm(max_tokens: int = 2000):
+    """Cheap/fast model client for compaction & other low-reasoning adhoc tasks."""
+    return _build_llm(
+        deployment=get_settings().mini_deployment,
+        json_mode=False,
+        max_tokens=max_tokens,
+        temperature=0.1,
     )
 
 
@@ -262,4 +290,44 @@ def invoke_json(
             logger.warning("LLM returned empty content (attempt %d)", attempt + 1)
         except Exception as exc:  # noqa: BLE001 - degrade gracefully for the MVP
             logger.error("LLM invocation failed (attempt %d): %s", attempt + 1, exc)
+    return default
+
+
+def invoke_text(
+    system_prompt: str,
+    user_prompt: str,
+    *,
+    default: str = "",
+    max_tokens: int = 2000,
+    cheap: bool = True,
+) -> str:
+    """Invoke a model and return its plain-text response (no JSON parsing).
+
+    Used for low-reasoning adhoc work such as chunk summarisation / compaction.
+    Defaults to the cheap ``mini`` deployment. Returns ``default`` when the LLM
+    is unconfigured or every attempt fails, so callers can fall back gracefully.
+    """
+    llm = (
+        get_compaction_llm(max_tokens=max_tokens)
+        if cheap
+        else _build_llm(json_mode=False, max_tokens=max_tokens, temperature=0.2)
+    )
+    if llm is None:
+        return default
+
+    from langchain_core.messages import HumanMessage, SystemMessage
+
+    messages = [SystemMessage(content=system_prompt), HumanMessage(content=user_prompt)]
+    for attempt in range(2):
+        try:
+            response = llm.invoke(messages)
+            content = response.content
+            if isinstance(content, list):
+                content = "".join(
+                    p.get("text", "") if isinstance(p, dict) else str(p) for p in content
+                )
+            if content and content.strip():
+                return content.strip()
+        except Exception as exc:  # noqa: BLE001
+            logger.error("Text LLM invocation failed (attempt %d): %s", attempt + 1, exc)
     return default

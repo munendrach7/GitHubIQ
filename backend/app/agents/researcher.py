@@ -41,6 +41,23 @@ DB_HINTS = re.compile(
     re.IGNORECASE,
 )
 
+# Files most relevant to tracing the main request/data-flow.
+FLOW_HINTS = re.compile(
+    r"(route|router|controller|handler|service|view|endpoint|api|resolver|"
+    r"consumer|worker|task|middleware|use[_-]?case)",
+    re.IGNORECASE,
+)
+
+# Files that best convey what the app is / does (for the presenter/UI).
+PRESENT_HINTS = re.compile(
+    r"(readme|index\.(js|ts|jsx|tsx)|app\.(js|ts|jsx|tsx)|page|screen|component|"
+    r"ui/|frontend/|views?/|templates?/)",
+    re.IGNORECASE,
+)
+
+# Specialists that actually READ assigned files in the active pipeline.
+FILE_READING_SPECIALISTS = ["architect", "schema", "dataflow", "tutor"]
+
 SPECIALISTS = ["architect", "schema", "dataflow", "tutor", "walkthrough"]
 
 
@@ -84,6 +101,42 @@ def _heuristic(ctx) -> ResearchBrief:
     )
 
 
+def _route_specialist(path: str) -> str:
+    """Pick the most relevant file-reading specialist for a captured file."""
+    low = path.lower()
+    if DB_HINTS.search(low):
+        return "schema"
+    if FLOW_HINTS.search(low):
+        return "dataflow"
+    return "architect"
+
+
+def _ensure_full_coverage(ctx, brief: ResearchBrief) -> None:
+    """Guarantee EVERY captured source file is assigned to ≥1 specialist.
+
+    ``ctx.contents`` holds only the files that scored as significant source at
+    fetch time. We union the Researcher's curated picks with a routed assignment
+    for any captured file it missed, so no significant file is left unread. The
+    compaction layer keeps these larger lists within each specialist's budget.
+    """
+    assignments = brief.file_assignments or {}
+    for key in SPECIALISTS:
+        assignments.setdefault(key, list(assignments.get(key, [])))
+
+    assigned_all = {
+        p for key in FILE_READING_SPECIALISTS for p in assignments.get(key, [])
+    }
+    # Normalise for membership tests (basename match tolerates path variants).
+    assigned_bases = {a.lower().rsplit("/", 1)[-1] for a in assigned_all}
+
+    for path in ctx.contents:
+        if path in assigned_all or path.lower().rsplit("/", 1)[-1] in assigned_bases:
+            continue
+        assignments[_route_specialist(path)].append(path)
+
+    brief.file_assignments = assignments
+
+
 def run(state: GraphState) -> dict:
     ctx = state["ctx"]
     reporter = state["reporter"]
@@ -108,8 +161,8 @@ def run(state: GraphState) -> dict:
         languages=", ".join(ctx.meta.languages) or "unknown",
         filecount=ctx.meta.file_count,
         custom_instructions=custom_block,
-        tree=ctx.file_listing(900),
-        anchors=ctx.anchor_sources(total_budget=150_000),
+        tree=ctx.file_listing(max(1400, ctx.meta.file_count or 0)),
+        anchors=ctx.anchor_sources(total_budget=260_000),
     )
     data = invoke_json(render("researcher_system"), prompt, default=None)
 
@@ -131,6 +184,9 @@ def run(state: GraphState) -> dict:
             brief = fallback
     else:
         brief = fallback
+
+    # Coverage safety net: make sure no captured source file is left unassigned.
+    _ensure_full_coverage(ctx, brief)
 
     reporter.update(
         "Researcher", "done", f"{len(brief.components)} components, {len(brief.entry_points)} entry points"

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from ..llm import invoke_json
+from ..compaction import compact_files
 from ..models import Lesson, Preferences
 from ..prompts import render
 from .state import GraphState
@@ -48,8 +49,12 @@ def run(state: GraphState) -> dict:
     reporter.update("Tutor", "running", "Explaining language idioms & patterns")
 
     fallback = _heuristic(ctx, prefs, brief)
-    sources = ctx.read_files(
-        brief.file_assignments.get("tutor", []), total_budget=80_000
+    sources = compact_files(
+        ctx,
+        brief.file_assignments.get("tutor", []),
+        budget=180_000,
+        focus="the language and framework idioms used here: decorators, hooks, "
+        "types, macros, module patterns and notable constructs",
     ) or ctx.sampled_sources(8)
     prompt = render(
         "tutor_user",

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from ..llm import invoke_json
+from ..compaction import compact_files
 from ..models import Schema
 from ..prompts import render
 from .state import GraphState
@@ -36,7 +37,13 @@ def run(state: GraphState) -> dict:
         reporter.update("Schema", "done", "no database")
         return {"schema": _empty("No database in this repository.")}
 
-    sources = ctx.read_files(assigned, total_budget=90_000) or ctx.sampled_sources(8)
+    sources = compact_files(
+        ctx,
+        assigned,
+        budget=200_000,
+        focus="database tables, columns, primary/foreign keys, relationships, "
+        "migrations and ORM model definitions",
+    ) or ctx.sampled_sources(8)
     prompt = render(
         "schema_user",
         owner=ctx.meta.owner,

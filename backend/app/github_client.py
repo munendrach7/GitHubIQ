@@ -72,33 +72,55 @@ class RepoContext:
             chunks.append(f"### FILE: {f.path}\n{f.content}")
         return "\n\n".join(chunks)
 
-    def anchor_sources(self, total_budget: int = 90_000) -> str:
+    def anchor_sources(self, total_budget: int = 200_000) -> str:
         """README + manifests + likely entry points, for the researcher agent."""
         paths = [p for p in self.contents if ANCHOR_PATTERNS.search(p.lower())]
         # readmes and manifests first, then shallow files
         paths.sort(key=lambda p: (p.count("/"), 0 if "readme" in p.lower() else 1))
-        return self.read_files(paths, total_budget=total_budget, per_file=16_000)
+        return self.read_files(paths, total_budget=total_budget, per_file=30_000)
 
     def read_files(
-        self, paths: list[str], *, total_budget: int = 60_000, per_file: int = 14_000
+        self, paths: list[str], *, total_budget: int = 140_000, per_file: int = 26_000
     ) -> str:
-        """Return concatenated contents for the given paths, within a token budget."""
+        """Return concatenated contents for the given paths, within a token budget.
+
+        Every file is delimited and, when its body is longer than ``per_file`` or
+        the overall budget forces a cut, an explicit truncation marker is emitted
+        so the agent knows it is not seeing the whole file (and must not assume the
+        omitted part). Assigned paths that could not be located in the snapshot are
+        reported at the end so the agent can reason about the gap instead of
+        silently hallucinating their contents.
+        """
         chunks: list[str] = []
         used = 0
         seen: set[str] = set()
+        missing: list[str] = []
         for path in paths:
             if not path or path in seen:
                 continue
             seen.add(path)
             body = self.contents.get(path) or self._fuzzy_get(path)
             if not body:
+                missing.append(path)
                 continue
-            snippet = body[:per_file]
-            block = f"### FILE: {path}\n{snippet}"
-            if used + len(block) > total_budget:
+            remaining = total_budget - used
+            if remaining <= 200:  # no meaningful room left
                 break
+            limit = min(per_file, remaining)
+            snippet = body[:limit]
+            if len(body) > len(snippet):
+                snippet += (
+                    f"\n... [truncated: showing {len(snippet):,} of "
+                    f"{len(body):,} chars of this file]"
+                )
+            block = f"### FILE: {path} ({len(body):,} chars)\n{snippet}"
             chunks.append(block)
             used += len(block)
+        if chunks and missing:
+            chunks.append(
+                "### NOTE — assigned files not found in the snapshot "
+                "(do not invent their contents): " + ", ".join(missing)
+            )
         return "\n\n".join(chunks)
 
     def _fuzzy_get(self, path: str) -> str:
@@ -209,7 +231,7 @@ class GitHubClient:
         selected: list[tuple[int, tarfile.TarInfo, str]] = []
         files: list[RepoFile] = []
         contents: dict[str, str] = {}
-        total_budget = 5_000_000  # ~5MB of source kept in memory
+        total_budget = 14_000_000  # ~14MB of source kept in memory
         used = 0
 
         with tarfile.open(fileobj=io.BytesIO(resp.content), mode="r:gz") as tar:
@@ -229,7 +251,7 @@ class GitHubClient:
                     continue
                 selected.append((score, member, rel))
                 # Populate the full content map within budget.
-                if used < total_budget and len(contents) < 600:
+                if used < total_budget and len(contents) < 1400:
                     extracted = tar.extractfile(member)
                     if extracted is not None:
                         raw = extracted.read(self.max_bytes)

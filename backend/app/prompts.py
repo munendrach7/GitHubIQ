@@ -28,6 +28,10 @@ STRICT GROUNDING — DO NOT HALLUCINATE:
   mention a component, function or route, name the concrete symbol/path.
 - If something cannot be determined from the provided context, say so plainly
   (e.g. "not visible in the provided files") instead of guessing.
+- A file block may end with a "[truncated: ...]" marker or a "files not found"
+  note. Treat truncated files as partial — rely only on the visible portion and
+  never assume what the omitted lines contain. Do not fabricate the contents of
+  files reported as not found.
 - Trace how the pieces connect across files (imports, calls, models, config).
   Reason about the actual control/data flow, not a generic template.
 - Be specific and concrete. Avoid vague, boilerplate phrasing that could apply
@@ -40,6 +44,18 @@ DEPTH:
 - Read the provided files carefully and synthesise how they work together.
 - Capture the real end-to-end implementation, edge cases and design choices a
   new contributor must understand before making a change.
+- Read EVERY file block you are given before answering — do not stop at the
+  first few. Cross-reference symbols defined in one file and used in another.
+""".strip()
+
+COVERAGE = """
+COVERAGE — MISS NOTHING THAT MATTERS:
+- Account for every significant piece of the provided context; do not silently
+  drop components, files, routes, tables or steps that clearly matter.
+- Prefer completeness over brevity: if several real items qualify, include them
+  all rather than an arbitrary subset.
+- When two files are related (caller/callee, model/migration, route/handler),
+  connect them explicitly instead of describing each in isolation.
 """.strip()
 
 
@@ -55,6 +71,8 @@ and decide EXACTLY which files each downstream specialist must read to do deep, 
 grounded work.
 
 $grounding
+
+$coverage
 
 You delegate work to five specialists and must give each a precise, high-signal \
 reading list drawn from the real file tree:
@@ -109,8 +127,10 @@ reference real modules/paths)",
   "notes": "anything important the specialists should know (gotchas, conventions)"
 }
 
-Rules: use ONLY real paths from the tree. Assign 6-15 of the MOST relevant files \
-per specialist (fewer only if the repo is tiny). Identify EVERY significant \
+Rules: use ONLY real paths from the tree. Assign 8-20 of the MOST relevant files \
+per specialist (fewer only if the repo is tiny), ordered most-important first. \
+Include EVERY file a specialist genuinely needs — do not under-assign and cause \
+them to miss context. Identify EVERY significant \
 component — never merge distinct services. If there is no database, set \
 has_database=false and schema=[]."""
 )
@@ -128,6 +148,7 @@ access, supporting calls).
 
 $grounding
 $depth
+$coverage
 
 Respond ONLY with strict JSON."""
 )
@@ -174,6 +195,8 @@ explanation.
 
 $grounding
 
+$coverage
+
 Respond ONLY with strict JSON."""
 )
 
@@ -211,6 +234,7 @@ explanation a newcomer can expand.
 
 $grounding
 $depth
+$coverage
 
 Respond ONLY with strict JSON."""
 )
@@ -350,5 +374,6 @@ def render(name: str, **kwargs: object) -> str:
     # Shared blocks are always available to every template.
     kwargs.setdefault("grounding", GROUNDING)
     kwargs.setdefault("depth", DEPTH)
+    kwargs.setdefault("coverage", COVERAGE)
     kwargs.setdefault("custom_instructions", "")
     return template.safe_substitute(**kwargs)

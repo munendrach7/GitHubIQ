@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from ..llm import invoke_json
+from ..compaction import compact_files
 from ..models import DataFlow, FlowStep
 from ..prompts import render
 from .state import GraphState
@@ -44,8 +45,12 @@ def run(state: GraphState) -> dict:
         f"- {n.id}: {n.label} ({n.role}, layer={n.layer})" for n in arch.nodes
     )
     tables = ", ".join(t.name for t in schema.tables) if schema and schema.tables else "(none)"
-    sources = ctx.read_files(
-        brief.file_assignments.get("dataflow", []), total_budget=110_000
+    sources = compact_files(
+        ctx,
+        brief.file_assignments.get("dataflow", []),
+        budget=240_000,
+        focus="the end-to-end path of the main operation: route -> handler -> "
+        "service -> data layer, with the data entering and leaving each hop",
     ) or ctx.sampled_sources(12)
     prompt = render(
         "dataflow_user",
