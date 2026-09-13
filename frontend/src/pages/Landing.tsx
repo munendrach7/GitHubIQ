@@ -24,7 +24,7 @@ const BENEFITS = [
 const STEPS = [
   { e: "🔗", t: "Point at a repo", d: "Paste any public GitHub URL." },
   { e: "🎯", t: "Tailor it", d: "Tell us your role, level and goals." },
-  { e: "🤖", t: "Agents analyze", d: "Six specialists crawl it in parallel." },
+  { e: "🤖", t: "Agents analyze", d: "Seven specialists crawl it in parallel." },
   { e: "✨", t: "Compose guide", d: "Findings merge into a living guide." },
   { e: "🧠", t: "Explore & export", d: "Interact, learn, and download." },
 ];
@@ -178,7 +178,7 @@ export default function Landing() {
       <section className="section" id="features">
         <div className="section-head">
           <h2>Everything you get in one guide</h2>
-          <p>Six specialist agents turn a raw repository into an interactive, explorable product — every view is generated from your actual code.</p>
+          <p>Seven specialist agents turn a raw repository into an interactive, explorable product — every view is generated from your actual code.</p>
         </div>
         <div className="feature-grid">
           {FEATURES.map((f) => (

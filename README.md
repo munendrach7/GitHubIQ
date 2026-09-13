@@ -8,7 +8,7 @@ GitHubIQ is an interactive project tutor that turns any Git repository into a li
 
 Understanding an existing codebase usually means reading outdated docs, tracing requests across many files, and interrupting teammates. GitHubIQ makes that ramp-up fast and visual.
 
-You sign in, paste a public repo URL (optionally scoping to a single folder), and answer a few questions about your role, experience and goals. Six specialist agents analyse the repository in parallel and compose a guide tailored to you.
+You sign in, paste a public repo URL (optionally scoping to a single folder), and answer a few questions about your role, experience and goals. Seven specialist agents analyse the repository in parallel and compose a guide tailored to you.
 
 ## Features
 
@@ -25,13 +25,13 @@ You sign in, paste a public repo URL (optionally scoping to a single folder), an
 
 1. Sign in and connect a public Git repository (optionally scope to a folder).
 2. Provide your role, experience level, goals and preferred depth.
-3. Six specialist agents crawl and analyse the repo in parallel.
+3. Seven specialist agents crawl and analyse the repo in parallel.
 4. An orchestrator composes the findings into a project-specific guide.
 5. Explore the guide, watch the narrated video, and export it.
 
 ## Analysis Pipeline
 
-GitHubIQ orchestrates six specialist agents with **LangGraph**:
+GitHubIQ orchestrates seven specialist agents with **LangGraph**:
 
 | Agent | Responsibility |
 | --- | --- |

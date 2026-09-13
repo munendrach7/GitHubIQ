@@ -246,7 +246,7 @@ export default function Questionnaire() {
       {error && <p style={{ color: "var(--pink)", marginTop: 18 }}>{error}</p>}
 
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 30, gap: 12, flexWrap: "wrap" }}>
-        <span className="muted">🧩 Six specialist agents will build your guide in parallel.</span>
+        <span className="muted">🧩 Seven specialist agents will build your guide in parallel.</span>
         <button className="btn primary" disabled={loading || !repo || !!cooling} onClick={generate}>
           {loading ? <><span className="spinner" /> Starting…</> : "Generate my interactive guide →"}
         </button>

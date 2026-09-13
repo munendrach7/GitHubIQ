@@ -61,7 +61,7 @@ export default function Analysis() {
       <div className="page-head">
         <h2>🔬 X-Raying the repository</h2>
         <p>
-          Six specialist agents work asynchronously to understand your codebase
+          Seven specialist agents work asynchronously to understand your codebase
           and draft your guide.
           {result?.llm_powered === false && (
             <span className="tag orange" style={{ marginLeft: 10 }}>heuristic mode</span>
