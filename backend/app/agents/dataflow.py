@@ -5,6 +5,7 @@ from ..llm import invoke_json
 from ..compaction import compact_files
 from ..models import DataFlow, FlowStep
 from ..prompts import render
+from ..scale import compute_scale
 from .state import GraphState
 
 SYSTEM = (
@@ -40,6 +41,7 @@ def run(state: GraphState) -> dict:
     schema = state.get("schema")
     reporter.update("Data-Flow", "running", "Tracing the main operation end to end")
 
+    scale = compute_scale(ctx.meta.file_count, getattr(state.get("preferences"), "depth", None))
     fallback = _heuristic(ctx, arch)
     node_summary = "\n".join(
         f"- {n.id}: {n.label} ({n.role}, layer={n.layer})" for n in arch.nodes
@@ -60,6 +62,8 @@ def run(state: GraphState) -> dict:
         nodes=node_summary,
         tables=tables,
         sources=sources,
+        step_min=scale.steps[0],
+        step_max=scale.steps[1],
     )
     data = invoke_json(render("dataflow_system"), prompt, default=None)
 

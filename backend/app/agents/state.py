@@ -26,12 +26,13 @@ class ProgressReporter:
 
     #: weight each agent contributes to the overall percentage
     WEIGHTS = {
-        "Researcher": 20,
-        "Architect": 18,
-        "Schema": 14,
-        "Data-Flow": 20,
-        "Tutor": 14,
-        "Presenter": 14,
+        "Researcher": 18,
+        "Architect": 15,
+        "Schema": 12,
+        "Data-Flow": 18,
+        "Deep-Dive": 13,
+        "Tutor": 12,
+        "Presenter": 12,
     }
 
     def __init__(self, result: AnalysisResult, store: Store) -> None:
@@ -87,5 +88,6 @@ class GraphState(TypedDict, total=False):
     schema: Schema
     dataflow: DataFlow
     tutor_lessons: list[Lesson]
+    component_deepdives: dict[str, str]
     video: VideoExplainer
     guide: Guide

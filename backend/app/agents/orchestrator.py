@@ -17,12 +17,20 @@ from ..models import (
     Lesson,
 )
 from ..storage import Store
-from . import architect, dataflow, presenter, researcher, schema, tutor
+from . import architect, dataflow, deepdive, presenter, researcher, schema, tutor
 from .state import GraphState, ProgressReporter
 
 logger = logging.getLogger("githubiq.orchestrator")
 
-AGENT_NAMES = ["Researcher", "Architect", "Schema", "Data-Flow", "Tutor", "Presenter"]
+AGENT_NAMES = [
+    "Researcher",
+    "Architect",
+    "Schema",
+    "Data-Flow",
+    "Deep-Dive",
+    "Tutor",
+    "Presenter",
+]
 
 
 def _compose(state: GraphState) -> dict:
@@ -34,6 +42,7 @@ def _compose(state: GraphState) -> dict:
     flow = state["dataflow"]
     sch = state["schema"]
     tutor_lessons = state.get("tutor_lessons", [])
+    deepdives = state.get("component_deepdives", {})
 
     # 1. Plain-language orientation: a rich summary first, then what/does/how.
     langs = brief.languages or ctx.meta.languages
@@ -122,6 +131,9 @@ def _compose(state: GraphState) -> dict:
         body = c.responsibility or f"The {c.name} component of {ctx.meta.name}."
         if c.tech:
             body += "\n\n**Tech:** " + ", ".join(f"`{t}`" for t in c.tech)
+        deep = deepdives.get(c.name)
+        if deep:
+            body += "\n\n" + deep.strip()
         flow_lines = []
         if called_by:
             flow_lines.append("- **Called by:** " + ", ".join(called_by))
@@ -212,6 +224,7 @@ def build_graph():
     g.add_node("agent_architect", architect.run)
     g.add_node("agent_schema", schema.run)
     g.add_node("agent_dataflow", dataflow.run)
+    g.add_node("agent_deepdive", deepdive.run)
     g.add_node("agent_tutor", tutor.run)
     g.add_node("agent_presenter", presenter.run)
     g.add_node("compose", _compose)
@@ -221,12 +234,14 @@ def build_graph():
     g.add_edge("agent_researcher", "agent_architect")
     g.add_edge("agent_researcher", "agent_schema")
     g.add_edge("agent_researcher", "agent_tutor")
-    # deepest chain: architect -> dataflow -> walkthrough -> compose
+    # deepest chain: architect -> dataflow -> deepdive -> presenter -> compose
     # LangGraph triggers a node per firing edge (not a barrier), so compose is
     # triggered ONLY by the deepest node. The earlier parallel results (schema,
-    # tutor) have already been written to the shared channels by then.
+    # tutor) have already been written to the shared channels by then. Deep-Dive
+    # sits on the critical path so its per-component sections are ready to merge.
     g.add_edge("agent_architect", "agent_dataflow")
-    g.add_edge("agent_dataflow", "agent_presenter")
+    g.add_edge("agent_dataflow", "agent_deepdive")
+    g.add_edge("agent_deepdive", "agent_presenter")
     g.add_edge("agent_presenter", "compose")
     g.add_edge("compose", END)
     return g.compile()

@@ -17,6 +17,7 @@ import re
 from ..llm import invoke_json
 from ..models import Component, ResearchBrief
 from ..prompts import render
+from ..scale import compute_scale
 from .state import GraphState
 
 SYSTEM = (
@@ -66,10 +67,11 @@ def _top_dirs(tree: list[str]) -> list[str]:
     for p in tree:
         if "/" in p:
             dirs[p.split("/")[0]] = dirs.get(p.split("/")[0], 0) + 1
-    return [d for d, _ in sorted(dirs.items(), key=lambda kv: kv[1], reverse=True)][:14]
+    return [d for d, _ in sorted(dirs.items(), key=lambda kv: kv[1], reverse=True)][:36]
 
 
 def _heuristic(ctx) -> ResearchBrief:
+    scale = compute_scale(ctx.meta.file_count, None)
     entry_points = [p for p in ctx.tree if ENTRY_HINTS.search(p)][:8]
     modules = _top_dirs(ctx.tree)
     has_db = any(DB_HINTS.search(p) for p in ctx.tree)
@@ -86,7 +88,7 @@ def _heuristic(ctx) -> ResearchBrief:
             responsibility=f"Top-level module '{m}'.",
             key_files=[p for p in ctx.tree if p.startswith(m + "/")][:5],
         )
-        for m in modules[:6]
+        for m in modules[: scale.components[1]]
     ]
     return ResearchBrief(
         what=ctx.meta.description or f"{ctx.meta.name} repository.",
@@ -153,6 +155,7 @@ def run(state: GraphState) -> dict:
     )
 
     fallback = _heuristic(ctx)
+    scale = compute_scale(ctx.meta.file_count, getattr(prefs, "depth", None))
     prompt = render(
         "researcher_user",
         owner=ctx.meta.owner,
@@ -163,6 +166,9 @@ def run(state: GraphState) -> dict:
         custom_instructions=custom_block,
         tree=ctx.file_listing(max(1400, ctx.meta.file_count or 0)),
         anchors=ctx.anchor_sources(total_budget=260_000),
+        size_label=scale.size_label,
+        component_min=scale.components[0],
+        component_max=scale.components[1],
     )
     data = invoke_json(render("researcher_system"), prompt, default=None)
 

@@ -39,10 +39,16 @@ GitHubIQ orchestrates six specialist agents with **LangGraph**:
 | Architect | Maps components, layers and how they interact (with tech and inbound/outbound edges). |
 | Schema | Reverse-engineers database tables, columns and relationships. |
 | Data-Flow | Traces the main operation end to end with real data at each hop. |
+| Deep-Dive | Writes an in-depth, code-grounded section for **every** component, so the guide scales with the repository. |
 | Tutor | Explains the language and framework idioms specific to this repo. |
 | Presenter | Scripts the persona-narrated video overview. |
 
-The researcher's curated file assignments are the key to capturing deep context. Findings are merged by an orchestrator before the guide is generated.
+The researcher's curated file assignments are the key to capturing deep context. A
+**chunked map-reduce compaction** layer (backed by a low-cost model) guarantees
+every assigned file contributes — large files are summarised chunk by chunk rather
+than dropped — and the output **scales with repo size**: bigger repositories yield
+more components, architecture nodes, data-flow steps and per-component deep dives.
+Findings are merged by an orchestrator before the guide is generated.
 
 ![GitHubIQ system architecture](Idea/screenshots/09-system-architecture.png)
 
@@ -51,7 +57,7 @@ The researcher's curated file assignments are the key to capturing deep context.
 A working MVP that analyses **public** GitHub repositories end to end.
 
 - **Backend** — Python / FastAPI with a **LangGraph** multi-agent pipeline
-  (Researcher → Architect ∥ Schema ∥ Tutor → Data-Flow → Presenter → compose)
+  (Researcher → Architect ∥ Schema ∥ Tutor → Data-Flow → Deep-Dive → Presenter → compose)
   using real fan-out/fan-in orchestration.
 - **Frontend** — React + Vite + TypeScript with a GitHub **dark/light** theme:
   component-wise guide (Markdown), narrated video player, drag-and-drop

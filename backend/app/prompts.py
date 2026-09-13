@@ -130,9 +130,10 @@ reference real modules/paths)",
 Rules: use ONLY real paths from the tree. Assign 8-20 of the MOST relevant files \
 per specialist (fewer only if the repo is tiny), ordered most-important first. \
 Include EVERY file a specialist genuinely needs — do not under-assign and cause \
-them to miss context. Identify EVERY significant \
-component — never merge distinct services. If there is no database, set \
-has_database=false and schema=[]."""
+them to miss context. Identify EVERY significant component (this is a $size_label \
+repo — expect roughly $component_min-$component_max components, but include MORE \
+if the code genuinely has more; never merge distinct services). If there is no \
+database, set has_database=false and schema=[]."""
 )
 
 
@@ -176,10 +177,12 @@ Return JSON: {"summary": str, \
 "kind": "request"|"event"|"support"|"data", \
 "protocol": "http"|"queue"|"sql"|"fs"|"internal"}]}.
 
-Produce 5-12 nodes covering the WHOLE system you can see (include databases, \
-queues, external services, UI). inbound/outbound must reference node ids and be \
-consistent with edges. Ground every node in a real file/symbol. Assign each node \
-to a layer."""
+Produce $node_min-$node_max nodes covering the WHOLE system you can see (include \
+databases, queues, external services, UI). Scale the count to the system's real \
+size — a large repo ($size_label) must not be collapsed into a handful of nodes; \
+represent every significant service/module you can see. inbound/outbound must \
+reference node ids and be consistent with edges. Ground every node in a real \
+file/symbol. Assign each node to a layer."""
 )
 
 
@@ -261,7 +264,7 @@ JSON: {"title": str, "trigger": str, "summary": str, \
 "detail": "2-4 sentences on what happens here and why"}], \
 "rationale": str, "alternatives": ["other notable real flows"]}.
 
-Use 5-9 steps grounded in the actual files. 'files' and 'code' must be real."""
+Use $step_min-$step_max steps grounded in the actual files. 'files' and 'code' must be real."""
 )
 
 
@@ -291,7 +294,7 @@ $sources
 Return JSON: {"lessons": [{"id": str, "title": str, "summary": str, \
 "body": str, "tags": [str]}]}.
 
-Produce 3-5 concrete lessons on the language/framework idioms and patterns used \
+Produce $lesson_min-$lesson_max concrete lessons on the language/framework idioms and patterns used \
 in THIS repo. Reference the real constructs, decorators, hooks, types or macros \
 you can see, and cite file paths. Match the learner's level. Format each 'body' \
 in GitHub-flavoured MARKDOWN: short paragraphs, **bold** for key terms, '-' \
@@ -337,6 +340,57 @@ real project). bullets are 2-4 short on-screen phrases. Keep it concise for a \
 
 
 # --------------------------------------------------------------------------- #
+# Component Deep-Dive (one rich section per component — scales with repo size)
+# --------------------------------------------------------------------------- #
+DEEPDIVE_SYSTEM = Template(
+    """You are the Component Deep-Dive agent. For ONE software component of a larger \
+system, you write the in-depth, code-grounded section a new contributor needs to \
+work on it confidently. You read the component's real source files and explain \
+what it is, how it is built, how data and control flow through it, how it connects \
+to the rest of the system, and where to start — tailored to the reader's role and \
+goals.
+
+$grounding
+$depth
+$coverage
+
+Respond ONLY with strict JSON."""
+)
+
+DEEPDIVE_USER = Template(
+    """Repository: $owner/$repo ($size_label repo)
+Project: $what
+Reader: role=$role; familiarity=$familiarity; depth=$reader_depth; goals=$goals
+
+COMPONENT: $component_name  [$kind]
+Path: $path
+Tech: $tech
+Responsibility (from the Researcher): $responsibility
+Connections (from the Architecture): $connections
+
+SOURCE FILES FOR THIS COMPONENT (read these; some may be condensed digests):
+$sources
+
+Write a thorough, accurate section about THIS component in GitHub-flavoured \
+MARKDOWN. Return JSON: {"body": str, "highlights": [str], \
+"key_files": [{"path": str, "role": str}]}.
+
+The 'body' MUST be comprehensive and scale to how much real code this component \
+has — cover ALL of these, using '##'/'###' headings, short paragraphs, '-' bullet \
+lists, **bold** for key terms, and fenced ```code``` snippets taken from the files:
+- What this component is and the responsibility it owns.
+- The key files and, for each important one, what it does (cite real paths).
+- The main classes / functions / routes / types and how they fit together.
+- How control and data flow THROUGH this component (inputs -> processing -> outputs).
+- How it connects to other components (what calls it, what it calls, protocols).
+- Configuration, external dependencies, and notable edge cases or gotchas.
+- A short "Start here" note pointing a $role reader to the right entry file.
+Do not pad with generic filler — every claim must reflect the real code. Longer, \
+detailed sections are expected for large components; keep small ones focused."""
+)
+
+
+# --------------------------------------------------------------------------- #
 # Registry + render
 # --------------------------------------------------------------------------- #
 _TEMPLATES: dict[str, Template] = {
@@ -350,6 +404,8 @@ _TEMPLATES: dict[str, Template] = {
     "dataflow_user": DATAFLOW_USER,
     "tutor_system": TUTOR_SYSTEM,
     "tutor_user": TUTOR_USER,
+    "deepdive_system": DEEPDIVE_SYSTEM,
+    "deepdive_user": DEEPDIVE_USER,
     "presenter_system": PRESENTER_SYSTEM,
     "presenter_user": PRESENTER_USER,
 }
@@ -376,4 +432,15 @@ def render(name: str, **kwargs: object) -> str:
     kwargs.setdefault("depth", DEPTH)
     kwargs.setdefault("coverage", COVERAGE)
     kwargs.setdefault("custom_instructions", "")
+    # Adaptive count ranges (see app/scale.py). Defaults keep templates valid even
+    # if an agent forgets to pass them.
+    kwargs.setdefault("node_min", 5)
+    kwargs.setdefault("node_max", 12)
+    kwargs.setdefault("step_min", 5)
+    kwargs.setdefault("step_max", 9)
+    kwargs.setdefault("lesson_min", 3)
+    kwargs.setdefault("lesson_max", 5)
+    kwargs.setdefault("component_min", 4)
+    kwargs.setdefault("component_max", 12)
+    kwargs.setdefault("size_label", "unknown-size")
     return template.safe_substitute(**kwargs)

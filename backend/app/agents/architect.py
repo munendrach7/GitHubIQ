@@ -5,6 +5,7 @@ from ..llm import invoke_json
 from ..compaction import compact_files
 from ..models import Architecture, ServiceEdge, ServiceNode
 from ..prompts import render
+from ..scale import compute_scale
 from .state import GraphState
 
 SYSTEM = (
@@ -50,6 +51,7 @@ def run(state: GraphState) -> dict:
     brief = state["research"]
     reporter.update("Architect", "running", "Mapping components, layers & edges")
 
+    scale = compute_scale(ctx.meta.file_count, getattr(state.get("preferences"), "depth", None))
     fallback = _heuristic(ctx, brief)
     comp_desc = "\n".join(
         f"- {c.id}: {c.name} [{c.kind}] path={c.path} tech={', '.join(c.tech)} — {c.responsibility}"
@@ -71,6 +73,9 @@ def run(state: GraphState) -> dict:
         notes=brief.notes or "(none)",
         components=comp_desc,
         sources=sources,
+        size_label=scale.size_label,
+        node_min=scale.nodes[0],
+        node_max=scale.nodes[1],
     )
     data = invoke_json(render("architect_system"), prompt, default=None)
 

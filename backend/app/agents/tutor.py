@@ -5,6 +5,7 @@ from ..llm import invoke_json
 from ..compaction import compact_files
 from ..models import Lesson, Preferences
 from ..prompts import render
+from ..scale import compute_scale
 from .state import GraphState
 
 SYSTEM = (
@@ -48,6 +49,7 @@ def run(state: GraphState) -> dict:
     brief = state["research"]
     reporter.update("Tutor", "running", "Explaining language idioms & patterns")
 
+    scale = compute_scale(ctx.meta.file_count, prefs.depth)
     fallback = _heuristic(ctx, prefs, brief)
     sources = compact_files(
         ctx,
@@ -67,6 +69,8 @@ def run(state: GraphState) -> dict:
         depth=prefs.depth.value,
         goals=", ".join(prefs.goals) or "general",
         sources=sources,
+        lesson_min=scale.lessons[0],
+        lesson_max=scale.lessons[1],
     )
     data = invoke_json(render("tutor_system"), prompt, default=None)
 

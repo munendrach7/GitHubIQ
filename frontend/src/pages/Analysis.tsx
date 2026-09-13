@@ -9,7 +9,9 @@ const AGENT_META: Record<string, { icon: string; desc: string }> = {
   Architect: { icon: "🏛️", desc: "Maps components, layers & interaction edges" },
   Schema: { icon: "🗄️", desc: "Reverse-engineers DB models & relations" },
   "Data-Flow": { icon: "🐬", desc: "Traces the main operation with real data" },
+  "Deep-Dive": { icon: "🔬", desc: "Writes an in-depth, code-grounded section per component" },
   Tutor: { icon: "🧑‍🏫", desc: "Explains the language idioms & patterns in this repo" },
+  Presenter: { icon: "🎥", desc: "Scripts the narrated video overview" },
   Walkthrough: { icon: "🎬", desc: "Builds a visual tour of the app's screens" },
 };
 
