@@ -10,7 +10,6 @@ const FEATURES = [
   { e: "🗺️", t: "Drag-and-drop architecture", p: "A layered, interactive map of services, data stores and externals. Drag the boxes, tap any node to see its tech and connections." },
   { e: "🐬", t: "Interactive data flow", p: "Follow the main operation hop by hop. Click any step to reveal the data in/out, the code, and the exact files involved." },
   { e: "🗄️", t: "ER schema diagram", p: "Your database reverse-engineered into a draggable ER diagram with foreign-key relationship lines — just like a real DB visualizer." },
-  { e: "🎬", t: "Visual app tour", p: "See what the app actually looks like: its main screens, what's on each, and how a user journeys through them." },
   { e: "📚", t: "Language tutor", p: "Just-in-time lessons on the specific language and framework idioms used in this repo, matched to your experience level." },
   { e: "📄", t: "Export to PDF", p: "Download the entire guide as a polished PDF to read offline or share with your team." },
   { e: "🧩", t: "Component-wise guide", p: "A Learn-style walkthrough that starts simple — what it is, what it does, how it works — then breaks the project down component by component." },
@@ -94,9 +93,8 @@ export default function Landing() {
           <p className="lead">
             GitHubIQ reads an entire Git repository and generates a living,
             interactive onboarding guide — a drag-and-drop architecture map, a
-            clickable data-flow trace, a reverse-engineered schema diagram, a
-            visual app tour and just-in-time language lessons. No boring
-            wall-of-text docs.
+            clickable data-flow trace, a reverse-engineered schema diagram and
+            just-in-time language lessons. No boring wall-of-text docs.
           </p>
 
           {cooling && (
