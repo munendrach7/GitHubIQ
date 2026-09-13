@@ -154,7 +154,7 @@ class GitHubClient:
         resp.raise_for_status()
         return resp
 
-    def fetch_context(self, owner: str, repo: str) -> RepoContext:
+    def fetch_context(self, owner: str, repo: str, scope_path: str = "") -> RepoContext:
         info = self._get(f"/repos/{owner}/{repo}").json()
         branch = info.get("default_branch", "main")
 
@@ -174,12 +174,27 @@ class GitHubClient:
             stars=info.get("stargazers_count", 0),
         )
 
-        tree, files, contents = self._download_tarball(owner, repo, branch)
+        scope = scope_path.strip().strip("/")
+        tree, files, contents = self._download_tarball(owner, repo, branch, scope)
         meta.file_count = len(tree)
         return RepoContext(meta=meta, tree=tree, files=files, contents=contents)
 
+    def list_dirs(self, owner: str, repo: str, limit: int = 800) -> list[str]:
+        """Return the repository's directory paths (for the folder explorer)."""
+        info = self._get(f"/repos/{owner}/{repo}").json()
+        branch = info.get("default_branch", "main")
+        data = self._get(f"/repos/{owner}/{repo}/git/trees/{branch}?recursive=1").json()
+        dirs = [
+            item["path"]
+            for item in data.get("tree", [])
+            if item.get("type") == "tree"
+            and not any(skip.strip("/") in item["path"].lower() for skip in SKIP_DIRS)
+        ]
+        dirs.sort()
+        return dirs[:limit]
+
     def _download_tarball(
-        self, owner: str, repo: str, branch: str
+        self, owner: str, repo: str, branch: str, scope: str = ""
     ) -> tuple[list[str], list[RepoFile], dict[str, str]]:
         """Fetch the whole repo as one gzipped tar and read it in-memory.
 
@@ -204,6 +219,9 @@ class GitHubClient:
                 # Strip the leading "owner-repo-sha/" directory the tarball adds.
                 rel = member.name.split("/", 1)[1] if "/" in member.name else member.name
                 if not rel:
+                    continue
+                # When a scope folder is given, only include files under it.
+                if scope and not (rel == scope or rel.startswith(scope + "/")):
                     continue
                 tree.append(rel)
                 score = self._score(rel, member.size)

@@ -40,6 +40,7 @@ export default function TopBar({ sub = "your Project Tutor", nav, right }: Props
         {right}
         {user && (
           <div className="user-chip">
+            <Link to="/history" className="myguides-link" title="Your saved guides">🕘 My guides</Link>
             <span className="user-name">
               {user.is_admin && <span className="admin-badge">ADMIN</span>}
               {user.username}

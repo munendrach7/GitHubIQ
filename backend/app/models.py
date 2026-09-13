@@ -1,10 +1,28 @@
 """Pydantic models shared across the API and the agent pipeline."""
 from __future__ import annotations
 
+import re
 from enum import Enum
 from typing import Any, Optional
 
 from pydantic import BaseModel, Field
+
+_SURROGATES = re.compile(r"[\ud800-\udfff]")
+
+
+def _strip_surrogates(obj: Any) -> Any:
+    """Remove lone UTF-16 surrogates that break UTF-8 JSON serialisation.
+
+    LLM output and decoded source files can contain unpaired surrogate code
+    points; these must be dropped before the document is JSON-encoded.
+    """
+    if isinstance(obj, str):
+        return _SURROGATES.sub("", obj)
+    if isinstance(obj, list):
+        return [_strip_surrogates(x) for x in obj]
+    if isinstance(obj, dict):
+        return {k: _strip_surrogates(v) for k, v in obj.items()}
+    return obj
 
 
 # --------------------------------------------------------------------------- #
@@ -39,6 +57,8 @@ class Preferences(BaseModel):
 class AnalyzeRequest(BaseModel):
     repo_url: str = Field(..., examples=["https://github.com/pallets/flask"])
     preferences: Preferences = Field(default_factory=Preferences)
+    # Optional: restrict analysis to a subfolder for a more focused guide.
+    scope_path: str = ""
 
 
 # --------------------------------------------------------------------------- #
@@ -211,6 +231,22 @@ class Sandbox(BaseModel):
     challenge: str = ""
 
 
+class VideoScene(BaseModel):
+    id: str
+    title: str
+    narration: str = ""            # what the presenter says (spoken)
+    bullets: list[str] = Field(default_factory=list)
+    visual: str = "intro"          # intro | components | architecture | dataflow | schema | tech | outro
+    accent: str = "blue"
+
+
+class VideoExplainer(BaseModel):
+    title: str = ""
+    persona: str = "Alex"          # the male presenter's name
+    tagline: str = ""
+    scenes: list[VideoScene] = Field(default_factory=list)
+
+
 class Component(BaseModel):
     id: str
     name: str
@@ -261,6 +297,7 @@ class AnalysisResult(BaseModel):
     repo_url: str
     owner: str = ""              # username who generated it
     created_at: float = 0.0
+    scope_path: str = ""         # subfolder the analysis was restricted to (blank = whole repo)
     status: AnalysisStatus = AnalysisStatus.queued
     progress: list[AgentProgress] = Field(default_factory=list)
     percent: int = 0
@@ -276,11 +313,12 @@ class AnalysisResult(BaseModel):
     schema_: Schema = Field(default_factory=Schema, alias="schema")
     guide: Guide = Field(default_factory=Guide)
     sandbox: Sandbox = Field(default_factory=Sandbox)
+    video: VideoExplainer = Field(default_factory=VideoExplainer)
 
     model_config = {"populate_by_name": True}
 
     def as_document(self) -> dict[str, Any]:
-        return self.model_dump(by_alias=True, mode="json")
+        return _strip_surrogates(self.model_dump(by_alias=True, mode="json"))
 
 
 class AnalysisSummary(BaseModel):

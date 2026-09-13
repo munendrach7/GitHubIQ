@@ -54,7 +54,10 @@ def run(state: GraphState) -> dict:
         "\"summary\": str, \"body\": str, \"tags\": [str]}]}. "
         "Produce 3-5 concise, concrete lessons on the specific language/framework "
         "idioms and patterns used in THIS repo (reference real constructs you see), "
-        "matched to the learner's experience level. Prefer showing over telling."
+        "matched to the learner's experience level. Prefer showing over telling. "
+        "Format each 'body' in GitHub-flavoured MARKDOWN: use short paragraphs, "
+        "**bold** for key terms, bullet lists with '-', and fenced ```code``` "
+        "blocks or `inline code` for real snippets and identifiers."
     )
     data = invoke_json(SYSTEM, prompt, default=None)
 

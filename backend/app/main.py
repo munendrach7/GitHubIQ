@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .config import get_settings
 from .llm import llm_available
-from .routers import analyze, auth
+from .routers import analyze, auth, tts
 from .storage import get_store
 
 logging.basicConfig(level=logging.INFO)
@@ -26,6 +26,7 @@ app.add_middleware(
 
 app.include_router(auth.router)
 app.include_router(analyze.router)
+app.include_router(tts.router)
 
 
 @app.get("/api/health")
@@ -35,6 +36,7 @@ def health() -> dict:
         "app": settings.app_name,
         "environment": settings.environment,
         "llm_configured": llm_available(),
+        "speech_configured": settings.speech_configured,
         "store": type(get_store()).__name__,
     }
 

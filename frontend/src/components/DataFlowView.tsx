@@ -2,10 +2,13 @@ import { useState } from "react";
 import type { DataFlow } from "../types";
 
 export default function DataFlowView({ flow }: { flow: DataFlow }) {
-  const [open, setOpen] = useState(0);
+  const [active, setActive] = useState(0);
   if (!flow.steps.length) {
     return <div className="glass empty">No data flow was traced for this repository.</div>;
   }
+  const step = flow.steps[Math.min(active, flow.steps.length - 1)];
+  const atStart = active <= 0;
+  const atEnd = active >= flow.steps.length - 1;
 
   return (
     <div>
@@ -16,53 +19,66 @@ export default function DataFlowView({ flow }: { flow: DataFlow }) {
         )}
         <p>{flow.summary}</p>
         <p className="dim" style={{ fontSize: 13, marginTop: 4 }}>
-          Tap any step to see exactly what happens, the data in/out, and the files involved.
+          Click a step on the rail — or press Next — to walk the request through the system.
         </p>
       </div>
 
-      <div className="flow-timeline">
-        {flow.steps.map((s, i) => {
-          const isOpen = open === i;
-          return (
-            <div key={s.index} className={`glass flow-item ${isOpen ? "open" : ""}`}>
-              <button className="flow-item-head" onClick={() => setOpen(isOpen ? -1 : i)}>
-                <span className={`flow-idx ${s.kind}`}>{s.index}</span>
-                <span className="flow-item-main">
-                  <span className="flow-actor">{s.actor}</span>
-                  <span className="flow-label">{s.label}</span>
-                </span>
-                <span className={`tag ${s.kind === "async" ? "purple" : "blue"}`}>{s.kind}</span>
-                <span className="flow-caret">{isOpen ? "▾" : "▸"}</span>
-              </button>
+      {/* Interactive flow rail */}
+      <div className="flow-rail">
+        {flow.steps.map((s, i) => (
+          <button
+            key={s.index}
+            className={`rail-node ${i === active ? "on" : ""} ${i < active ? "done" : ""}`}
+            onClick={() => setActive(i)}
+          >
+            <span className={`rail-num ${s.kind}`}>{s.index}</span>
+            <span className="rail-actor">{s.actor}</span>
+            {i < flow.steps.length - 1 && <span className="rail-arrow">→</span>}
+          </button>
+        ))}
+      </div>
 
-              {isOpen && (
-                <div className="flow-item-body">
-                  {s.detail && <p className="flow-detail">{s.detail}</p>}
-                  {(s.data_in || s.data_out) && (
-                    <div className="flow-data">
-                      <div className="flow-data-cell">
-                        <div className="io-label">Data in</div>
-                        <code className="mono">{s.data_in || "—"}</code>
-                      </div>
-                      <div className="flow-data-arrow">→</div>
-                      <div className="flow-data-cell">
-                        <div className="io-label">Data out</div>
-                        <code className="mono">{s.data_out || "—"}</code>
-                      </div>
-                    </div>
-                  )}
-                  {s.code && <pre className="mono flow-code">{s.code}</pre>}
-                  {(s.files || []).length > 0 && (
-                    <div className="flow-files">
-                      {s.files.map((f) => <span key={f} className="tag green mono">{f}</span>)}
-                    </div>
-                  )}
-                  {s.note && <div className="flow-note">💡 {s.note}</div>}
-                </div>
-              )}
+      {/* Active step detail */}
+      <div className="glass card flow-active" key={step.index}>
+        <div className="flow-active-head">
+          <span className={`flow-idx ${step.kind}`}>{step.index}</span>
+          <div>
+            <div className="flow-actor">{step.actor}</div>
+            <div className="muted">{step.label}</div>
+          </div>
+          <span className={`tag ${step.kind === "async" ? "purple" : "blue"}`} style={{ marginLeft: "auto" }}>{step.kind}</span>
+        </div>
+
+        {step.detail && <p className="flow-detail">{step.detail}</p>}
+
+        {(step.data_in || step.data_out) && (
+          <div className="flow-data">
+            <div className="flow-data-cell">
+              <div className="io-label">Data in</div>
+              <code className="mono">{step.data_in || "—"}</code>
             </div>
-          );
-        })}
+            <div className="flow-data-arrow">→</div>
+            <div className="flow-data-cell">
+              <div className="io-label">Data out</div>
+              <code className="mono">{step.data_out || "—"}</code>
+            </div>
+          </div>
+        )}
+
+        {step.code && <pre className="mono flow-code">{step.code}</pre>}
+
+        {(step.files || []).length > 0 && (
+          <div className="flow-files">
+            <span className="io-label" style={{ marginRight: 4 }}>Files:</span>
+            {step.files.map((f) => <span key={f} className="tag green mono">{f}</span>)}
+          </div>
+        )}
+
+        <div className="flow-nav">
+          <button className="btn ghost" disabled={atStart} onClick={() => setActive(active - 1)}>← Previous</button>
+          <span className="dim">{active + 1} of {flow.steps.length}</span>
+          <button className="btn accent" disabled={atEnd} onClick={() => setActive(active + 1)}>Next step →</button>
+        </div>
       </div>
 
       <div className="grid-2" style={{ marginTop: 16 }}>

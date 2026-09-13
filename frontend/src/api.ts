@@ -73,12 +73,23 @@ export async function getRate(): Promise<RateStatus> {
 
 export async function startAnalysis(
   repoUrl: string,
-  preferences: Preferences
+  preferences: Preferences,
+  scopePath = ""
 ): Promise<AnalysisResult> {
   const res = await fetch(`${BASE}/api/analyze`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders() },
-    body: JSON.stringify({ repo_url: repoUrl, preferences }),
+    body: JSON.stringify({ repo_url: repoUrl, preferences, scope_path: scopePath }),
+  });
+  if (!res.ok) throw await parseError(res);
+  return res.json();
+}
+
+export async function getRepoTree(
+  repoUrl: string
+): Promise<{ owner: string; repo: string; dirs: string[] }> {
+  const res = await fetch(`${BASE}/api/repo/tree?repo_url=${encodeURIComponent(repoUrl)}`, {
+    headers: authHeaders(),
   });
   if (!res.ok) throw await parseError(res);
   return res.json();
@@ -94,4 +105,25 @@ export async function listAnalyses(): Promise<AnalysisSummary[]> {
   const res = await fetch(`${BASE}/api/analyses`, { headers: authHeaders() });
   if (!res.ok) throw await parseError(res);
   return res.json();
+}
+
+export async function ttsAvailable(): Promise<boolean> {
+  try {
+    const res = await fetch(`${BASE}/api/tts/config`);
+    if (!res.ok) return false;
+    return (await res.json()).available === true;
+  } catch {
+    return false;
+  }
+}
+
+export async function fetchNarration(text: string): Promise<string> {
+  const res = await fetch(`${BASE}/api/tts`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ text }),
+  });
+  if (!res.ok) throw await parseError(res);
+  const blob = await res.blob();
+  return URL.createObjectURL(blob);
 }

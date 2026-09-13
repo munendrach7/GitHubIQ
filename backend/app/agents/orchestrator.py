@@ -17,12 +17,12 @@ from ..models import (
     Lesson,
 )
 from ..storage import Store
-from . import architect, dataflow, researcher, sandbox, schema, tutor
+from . import architect, dataflow, presenter, researcher, schema, tutor
 from .state import GraphState, ProgressReporter
 
 logger = logging.getLogger("githubiq.orchestrator")
 
-AGENT_NAMES = ["Researcher", "Architect", "Schema", "Data-Flow", "Tutor", "Walkthrough"]
+AGENT_NAMES = ["Researcher", "Architect", "Schema", "Data-Flow", "Tutor", "Presenter"]
 
 
 def _compose(state: GraphState) -> dict:
@@ -69,7 +69,15 @@ def _compose(state: GraphState) -> dict:
     # 2. Component-wise breakdown when the repo has multiple components.
     for c in brief.components:
         nodes_in = [n for n in arch.nodes if (n.component or "").lower() == c.name.lower()]
-        detail = "; ".join(f"{n.label} — {n.summary}" for n in nodes_in)
+        parts = "\n".join(f"- **{n.label}** — {n.summary}" for n in nodes_in)
+        files = "\n".join(f"- `{f}`" for f in c.key_files)
+        body = c.responsibility
+        if c.tech:
+            body += "\n\n**Tech:** " + ", ".join(f"`{t}`" for t in c.tech)
+        if parts:
+            body += "\n\n**Key parts**\n" + parts
+        if files:
+            body += "\n\n**Key files**\n" + files
         lessons.append(
             Lesson(
                 id=f"cmp-{c.id}",
@@ -78,8 +86,7 @@ def _compose(state: GraphState) -> dict:
                 icon="🧩",
                 component=c.name,
                 summary=f"{c.kind} · {', '.join(c.tech) or ctx.meta.primary_language}",
-                body=(c.responsibility + ("\n\nKey parts: " + detail if detail else "")
-                      + ("\n\nKey files: " + ", ".join(c.key_files) if c.key_files else "")),
+                body=body,
                 tags=[c.kind] + c.tech[:2],
             )
         )
@@ -116,13 +123,13 @@ def _compose(state: GraphState) -> dict:
         lessons.append(l)
     lessons.append(
         Lesson(
-            id="walkthrough",
-            title="See what the app looks like",
+            id="video",
+            title="Watch the 60-second tour",
             section="Go deeper",
-            icon="🎬",
-            summary=state["sandbox"].summary,
-            body=state["sandbox"].challenge,
-            tags=["walkthrough", "visual"],
+            icon="\ud83c\udfa5",
+            summary=state["video"].tagline or "A narrated video overview of the project.",
+            body="Head to the Video tab for a quick narrated walkthrough by Alex.",
+            tags=["video", "overview"],
         )
     )
 
@@ -137,7 +144,7 @@ def _compose(state: GraphState) -> dict:
         ),
         lessons=lessons,
     )
-    reporter.update("Walkthrough", "done", "guide composed")
+    reporter.update("Presenter", "done", "guide composed")
     return {"guide": guide}
 
 
@@ -150,7 +157,7 @@ def build_graph():
     g.add_node("agent_schema", schema.run)
     g.add_node("agent_dataflow", dataflow.run)
     g.add_node("agent_tutor", tutor.run)
-    g.add_node("agent_walkthrough", sandbox.run)
+    g.add_node("agent_presenter", presenter.run)
     g.add_node("compose", _compose)
 
     g.add_edge(START, "agent_researcher")
@@ -163,8 +170,8 @@ def build_graph():
     # triggered ONLY by the deepest node. The earlier parallel results (schema,
     # tutor) have already been written to the shared channels by then.
     g.add_edge("agent_architect", "agent_dataflow")
-    g.add_edge("agent_dataflow", "agent_walkthrough")
-    g.add_edge("agent_walkthrough", "compose")
+    g.add_edge("agent_dataflow", "agent_presenter")
+    g.add_edge("agent_presenter", "compose")
     g.add_edge("compose", END)
     return g.compile()
 
@@ -202,7 +209,7 @@ def run_pipeline(result: AnalysisResult, ctx, store: Store) -> AnalysisResult:
     result.architecture = final["architecture"]
     result.schema_ = final["schema"]
     result.dataflow = final["dataflow"]
-    result.sandbox = final["sandbox"]
+    result.video = final["video"]
     result.guide = final["guide"]
     reporter.finish()
     return result

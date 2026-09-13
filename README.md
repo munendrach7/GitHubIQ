@@ -1,69 +1,74 @@
 # GitHubIQ
 
-GitHubIQ is an interactive project tutor that helps developers understand unfamiliar Git repositories. It turns repository analysis into a guided learning experience with architecture maps, data-flow walkthroughs, schema explanations, and hands-on sandbox exercises.
+GitHubIQ is an interactive project tutor that turns any Git repository into a living, explorable onboarding guide. A crew of specialist AI agents crawls the codebase and produces a component-wise guide, a drag-and-drop architecture map, a click-through data-flow trace, a reverse-engineered database schema, and a short **persona-narrated video overview**.
 
 ![GitHubIQ - Your Project Tutor](Idea/screenshots/00-cover.png)
 
 ## Overview
 
-Understanding an existing codebase often requires reading outdated documentation, tracing requests across many files, and asking experienced teammates for help. GitHubIQ is designed to make that process clearer and more practical.
+Understanding an existing codebase usually means reading outdated docs, tracing requests across many files, and interrupting teammates. GitHubIQ makes that ramp-up fast and visual.
 
-Users provide a Git repository and answer a short set of questions about their role, experience, and learning goals. The system analyzes the repository and organizes the results into a personalized guide based on the actual project.
+You sign in, paste a public repo URL (optionally scoping to a single folder), and answer a few questions about your role, experience and goals. Six specialist agents analyse the repository in parallel and compose a guide tailored to you.
 
 ## Features
 
-- Guided tours of important application flows
-- Architecture views showing how components interact
-- Data-flow explanations showing how values change across a request
-- Database schema and relationship explanations
-- Language and framework concepts explained in context
-- A safe sandbox for experimenting with core project flows
-- Personalized learning content based on the user's goals
-- Exportable learning material without vendor lock-in
+- **Component-wise guide** — starts with plain-language *what / what it does / how it works*, then breaks the project down component by component, with rich Markdown (headings, bullets, code).
+- **Persona-narrated video** — a short auto-playing explainer where a presenter (Alex) walks you through the project with animated slides, captions and **Azure Speech** narration.
+- **Drag-and-drop architecture map** — layered, interactive diagram; drag the components, click a node to see its tech and connections.
+- **Click-through data flow** — walk a real request hop by hop and see the data transform, the code and the files at each step.
+- **ER schema diagram** — the database reverse-engineered into a draggable diagram with foreign-key relationship lines (hidden when the repo has no database).
+- **Folder scoping** — analyse the whole repo, or restrict to a single folder via a file explorer for a tighter guide.
+- **Accounts, history & rate limiting** — sign in, revisit every guide you've generated, and a configurable per-user quota (default 1 analysis / 4 h; admins are unlimited).
+- **Export to PDF** and a GitHub **dark/light** theme.
 
 ## How It Works
 
-1. Connect a public or private Git repository.
-2. Provide your role, experience level, goals, and preferred learning depth.
-3. Analyze the repository structure, architecture, schema, data flows, and coding patterns.
-4. Combine the analysis into a project-specific learning guide.
-5. Explore the guide through visual explanations, walkthroughs, and exercises.
+1. Sign in and connect a public Git repository (optionally scope to a folder).
+2. Provide your role, experience level, goals and preferred depth.
+3. Six specialist agents crawl and analyse the repo in parallel.
+4. An orchestrator composes the findings into a project-specific guide.
+5. Explore the guide, watch the narrated video, and export it.
 
 ## Analysis Pipeline
 
-GitHubIQ uses a set of specialized analysis roles:
+GitHubIQ orchestrates six specialist agents with **LangGraph**:
 
-| Role | Responsibility |
+| Agent | Responsibility |
 | --- | --- |
-| Explorer | Maps repository structure, entry points, and module boundaries. |
-| Architect | Identifies services, layers, and relationships between components. |
-| Schema Analyst | Finds database models and explains their relationships. |
-| Data-Flow Analyst | Traces requests and explains how data changes. |
-| Tutor | Explains unfamiliar languages, frameworks, and coding patterns. |
-| Sandbox Builder | Creates safe exercises based on important project flows. |
+| Researcher | Crawls the repo like an engineer: maps structure, finds entry points, identifies components and assigns the exact files each specialist should read. |
+| Architect | Maps components, layers and how they interact (with tech and inbound/outbound edges). |
+| Schema | Reverse-engineers database tables, columns and relationships. |
+| Data-Flow | Traces the main operation end to end with real data at each hop. |
+| Tutor | Explains the language and framework idioms specific to this repo. |
+| Presenter | Scripts the persona-narrated video overview. |
 
-The analysis results are combined by an orchestrator before the learning guide is generated.
+The researcher's curated file assignments are the key to capturing deep context. Findings are merged by an orchestrator before the guide is generated.
 
 ![GitHubIQ system architecture](Idea/screenshots/09-system-architecture.png)
 
 ## MVP Implementation
 
-This repository contains a working MVP that analyses **public** GitHub repositories
-end to end.
+A working MVP that analyses **public** GitHub repositories end to end.
 
-- **Backend** — Python / FastAPI with a **LangGraph** multi-agent pipeline. Six
-  specialist agents (Explorer, Architect, Schema, Data-Flow, Tutor, Sandbox) run
-  with real fan-out/fan-in orchestration, and an orchestrator composes the guide.
-- **Frontend** — React + Vite + TypeScript, with a GitHub **dark/light** theme
-  switcher. Views: guided lessons, live architecture map, data-flow walkthrough,
-  reverse-engineered schema, and a runnable in-browser sandbox.
-- **LLM** — Azure OpenAI (provisioned via Azure AI Foundry). Agents degrade
-  gracefully to heuristics when no LLM is configured, so the app always runs.
-- **Database** — Azure Cosmos DB (serverless) stores the semi-structured guide
-  documents; an in-memory store is used automatically for local dev.
-- **Containers** — `Dockerfile` for each service plus `docker-compose.yml`.
-- **Cloud** — `infra/main.bicep` + `azure.yaml` deploy Azure Container Apps,
-  Azure OpenAI, Cosmos DB and Log Analytics.
+- **Backend** — Python / FastAPI with a **LangGraph** multi-agent pipeline
+  (Researcher → Architect ∥ Schema ∥ Tutor → Data-Flow → Presenter → compose)
+  using real fan-out/fan-in orchestration.
+- **Frontend** — React + Vite + TypeScript with a GitHub **dark/light** theme:
+  component-wise guide (Markdown), narrated video player, drag-and-drop
+  architecture map, click-through data flow, draggable ER schema, folder-scope
+  picker, history and PDF export.
+- **AI** — Azure OpenAI **gpt-4.1** and Azure **Speech** text-to-speech, both
+  hosted in one Azure AI Foundry (AI Services) account. Agents degrade to
+  heuristics when no LLM is configured, so the app always runs.
+- **Auth** — signup/login with signed tokens, an admin bypass and a configurable
+  per-user rate limit. Passwords are hashed (PBKDF2); the admin password is
+  stored only as a hash, never in source.
+- **Database** — Azure Cosmos DB (serverless) for guides and users; an in-memory
+  store is used automatically for local dev.
+- **Containers** — a `Dockerfile` per service plus `docker-compose.yml`.
+- **Cloud & CI/CD** — `infra/main.bicep` + `azure.yaml` for Azure Container Apps,
+  and GitHub Actions workflows (`.github/workflows/`) that build images in ACR
+  and deploy via OIDC (no secrets in the repo).
 
 ### Project layout
 
@@ -144,10 +149,6 @@ az deployment group create -g rg-githubiq -f infra/main.bicep
 ### Database Schema
 
 ![Database schema](Idea/screenshots/07-schema.png)
-
-### Sandbox
-
-![Sandbox](Idea/screenshots/08-sandbox.png)
 
 ### Problem and Solution
 

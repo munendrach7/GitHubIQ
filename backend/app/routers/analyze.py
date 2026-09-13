@@ -32,7 +32,7 @@ def _run_analysis(analysis_id: str, req: AnalyzeRequest) -> None:
     try:
         owner, repo = parse_repo_url(req.repo_url)
         with GitHubClient() as gh:
-            ctx = gh.fetch_context(owner, repo)
+            ctx = gh.fetch_context(owner, repo, req.scope_path)
     except Exception as exc:  # noqa: BLE001
         logger.exception("Failed to fetch repo")
         result.status = AnalysisStatus.error
@@ -67,6 +67,7 @@ def analyze(
         repo_url=req.repo_url,
         owner=user.username,
         created_at=time.time(),
+        scope_path=req.scope_path.strip().strip("/"),
         preferences=req.preferences,
         status=AnalysisStatus.queued,
         progress=[AgentProgress(name=n, status="waiting") for n in AGENT_NAMES],
@@ -76,6 +77,18 @@ def analyze(
     record_generation(store, user)
     background.add_task(_run_analysis, analysis_id, req)
     return result
+
+
+@router.get("/repo/tree")
+def repo_tree(repo_url: str, _user: User = Depends(get_current_user)) -> dict:
+    """Directory listing for the folder-scope explorer on the analysis form."""
+    try:
+        owner, repo = parse_repo_url(repo_url)
+        with GitHubClient() as gh:
+            dirs = gh.list_dirs(owner, repo)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=400, detail=f"Could not read repository: {exc}")
+    return {"owner": owner, "repo": repo, "dirs": dirs}
 
 
 @router.get("/analyses", response_model=list[AnalysisSummary])

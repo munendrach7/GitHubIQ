@@ -27,6 +27,20 @@ class Settings(BaseSettings):
     # GitHub
     github_token: str = ""
 
+    # Azure Speech (text-to-speech for the video explainer). Part of the same
+    # Azure AI Foundry (AIServices) account, so the key defaults to the OpenAI key.
+    speech_region: str = "eastus2"
+    speech_key: str = ""
+    speech_voice: str = "en-US-AndrewMultilingualNeural"
+
+    @property
+    def speech_api_key(self) -> str:
+        return self.speech_key or self.azure_openai_api_key
+
+    @property
+    def speech_configured(self) -> bool:
+        return bool(self.speech_api_key and self.speech_region)
+
     # Auth & rate limiting
     auth_secret: str = "dev-insecure-secret-change-me"
     admin_username: str = "munendra"

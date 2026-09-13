@@ -38,7 +38,7 @@ function formatDate(ts: number): string {
 }
 
 export default function Landing() {
-  const [repo, setRepo] = useState("https://github.com/tiangolo/fastapi");
+  const [repo, setRepo] = useState("");
   const nav = useNavigate();
   const { user } = useAuth();
   const cooling = user && !user.is_admin && !user.rate?.can_generate;
@@ -71,11 +71,6 @@ export default function Landing() {
   return (
     <>
       <TopBar
-        nav={[
-          { label: "Home", to: "/", active: true },
-          { label: "Features", to: "/#features" },
-          { label: "How it works", to: "/#how" },
-        ]}
         right={
           user ? (
             <span className="pill">

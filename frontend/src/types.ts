@@ -138,6 +138,22 @@ export interface Sandbox {
   challenge: string;
 }
 
+export interface VideoScene {
+  id: string;
+  title: string;
+  narration: string;
+  bullets: string[];
+  visual: string;
+  accent: string;
+}
+
+export interface VideoExplainer {
+  title: string;
+  persona: string;
+  tagline: string;
+  scenes: VideoScene[];
+}
+
 export interface Component {
   id: string;
   name: string;
@@ -218,4 +234,5 @@ export interface AnalysisResult {
   schema: Schema;
   guide: Guide;
   sandbox: Sandbox;
+  video: VideoExplainer;
 }

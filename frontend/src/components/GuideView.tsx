@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { AnalysisResult, Lesson } from "../types";
+import Markdown from "./Markdown";
 
 export default function GuideView({ result }: { result: AnalysisResult }) {
   const lessons = result.guide.lessons;
@@ -58,13 +59,8 @@ export default function GuideView({ result }: { result: AnalysisResult }) {
             <span key={t} className="tag purple">{t}</span>
           ))}
         </div>
-        <div className="glass card">
-          {(active?.body || active?.summary || "")
-            .split(/\n{2,}/)
-            .filter(Boolean)
-            .map((para, i) => (
-              <p key={i} className="lesson-para">{para}</p>
-            ))}
+        <div className="glass card lesson-body">
+          <Markdown text={active?.body || active?.summary || ""} />
         </div>
 
         <div style={{ display: "flex", justifyContent: "space-between", marginTop: 20, gap: 10 }}>

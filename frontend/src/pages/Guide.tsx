@@ -5,7 +5,7 @@ import GuideView from "../components/GuideView";
 import ArchitectureView from "../components/ArchitectureView";
 import DataFlowView from "../components/DataFlowView";
 import SchemaView from "../components/SchemaView";
-import SandboxView from "../components/SandboxView";
+import VideoView from "../components/VideoView";
 import { getAnalysis } from "../api";
 import { exportGuidePdf } from "../pdf";
 import type { AnalysisResult } from "../types";
@@ -25,10 +25,10 @@ export default function Guide() {
   const hasSchema = !!result?.schema?.tables?.length;
   const tabs = [
     { key: "", label: "My Guide" },
+    { key: "video", label: "🎥 Video" },
     { key: "architecture", label: "Architecture" },
     { key: "dataflow", label: "Data Flow" },
     ...(hasSchema ? [{ key: "schema", label: "Schema" }] : []),
-    { key: "sandbox", label: "App Tour" },
   ];
 
   const exportPdf = () => {
@@ -77,10 +77,10 @@ export default function Guide() {
       </div>
 
       {activeTab === "" && <GuideView result={result} />}
+      {activeTab === "video" && <VideoView result={result} />}
       {activeTab === "architecture" && <ArchitectureView arch={result.architecture} />}
       {activeTab === "dataflow" && <DataFlowView flow={result.dataflow} />}
       {activeTab === "schema" && <SchemaView schema={result.schema} />}
-      {activeTab === "sandbox" && <SandboxView sandbox={result.sandbox} />}
     </>
   );
 }

@@ -12,8 +12,8 @@ from ..models import (
     Guide,
     Lesson,
     ResearchBrief,
-    Sandbox,
     Schema,
+    VideoExplainer,
 )
 from ..storage import Store
 
@@ -31,7 +31,7 @@ class ProgressReporter:
         "Schema": 14,
         "Data-Flow": 20,
         "Tutor": 14,
-        "Walkthrough": 14,
+        "Presenter": 14,
     }
 
     def __init__(self, result: AnalysisResult, store: Store) -> None:
@@ -87,5 +87,5 @@ class GraphState(TypedDict, total=False):
     schema: Schema
     dataflow: DataFlow
     tutor_lessons: list[Lesson]
-    sandbox: Sandbox
+    video: VideoExplainer
     guide: Guide
