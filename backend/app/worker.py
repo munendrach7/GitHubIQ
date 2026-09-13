@@ -35,6 +35,9 @@ from .models import AnalysisResult, AnalysisStatus
 from .storage import get_store
 
 logging.basicConfig(level=logging.INFO)
+# Azure SDKs log every HTTP request/response at INFO; the 1s cancel-intent poll
+# alone floods the log with 404s. Keep only warnings+ from the SDK loggers.
+logging.getLogger("azure").setLevel(logging.WARNING)
 logger = logging.getLogger("githubiq.worker")
 
 _TERMINAL = {AnalysisStatus.done, AnalysisStatus.error, AnalysisStatus.cancelled}

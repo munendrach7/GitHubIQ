@@ -13,6 +13,9 @@ from .routers import analyze, auth, tts
 from .storage import get_store
 
 logging.basicConfig(level=logging.INFO)
+# Quiet the very chatty Azure SDK HTTP request/response logging (Cosmos, Service
+# Bus, Identity); our own app logs stay at INFO.
+logging.getLogger("azure").setLevel(logging.WARNING)
 
 settings = get_settings()
 app = FastAPI(title=settings.app_name, version="0.1.0")
