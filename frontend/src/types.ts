@@ -7,6 +7,7 @@ export interface Preferences {
   familiarity: Familiarity;
   goals: string[];
   depth: Depth;
+  custom_instructions?: string;
 }
 
 export interface RepoMeta {

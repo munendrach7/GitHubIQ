@@ -35,8 +35,42 @@ def _compose(state: GraphState) -> dict:
     sch = state["schema"]
     tutor_lessons = state.get("tutor_lessons", [])
 
-    # 1. Simple, plain-language orientation first.
+    # 1. Plain-language orientation: a rich summary first, then what/does/how.
+    langs = brief.languages or ctx.meta.languages
+    facts: list[str] = []
+    if ctx.meta.primary_language or langs:
+        facts.append(f"- **Primary language:** {ctx.meta.primary_language or langs[0]}")
+    if langs:
+        facts.append("- **Stack / languages:** " + ", ".join(langs[:6]))
+    if brief.components:
+        facts.append(
+            f"- **Components ({len(brief.components)}):** "
+            + ", ".join(c.name for c in brief.components[:8])
+        )
+    if brief.entry_points:
+        facts.append("- **Entry points:** " + ", ".join(f"`{e}`" for e in brief.entry_points[:6]))
+    facts.append(f"- **Database:** {'yes' if brief.has_database else 'none detected'}")
+    if ctx.meta.file_count:
+        facts.append(f"- **Files analysed:** {ctx.meta.file_count}")
+
+    overview_body = brief.what or ctx.meta.description or f"{ctx.meta.name} repository."
+    if brief.does:
+        overview_body += "\n\n" + brief.does
+    if facts:
+        overview_body += "\n\n**At a glance**\n" + "\n".join(facts)
+    if brief.notes:
+        overview_body += "\n\n**Good to know:** " + brief.notes
+
     lessons: list[Lesson] = [
+        Lesson(
+            id="overview",
+            title="Project overview",
+            section="Start here",
+            icon="🧭",
+            summary=brief.what or ctx.meta.description or "A quick map of the whole project.",
+            body=overview_body,
+            tags=["overview", "summary"],
+        ),
         Lesson(
             id="what",
             title="What is this project?",
@@ -66,18 +100,39 @@ def _compose(state: GraphState) -> dict:
         ),
     ]
 
-    # 2. Component-wise breakdown when the repo has multiple components.
+    # 2. Component-wise breakdown: description, high-level flow, and key files.
+    id_to_comp = {n.id: (n.component or "") for n in arch.nodes}
     for c in brief.components:
         nodes_in = [n for n in arch.nodes if (n.component or "").lower() == c.name.lower()]
+        calls: list[str] = []
+        called_by: list[str] = []
+        for n in nodes_in:
+            for t in n.outbound:
+                comp = id_to_comp.get(t, "")
+                if comp and comp.lower() != c.name.lower() and comp not in calls:
+                    calls.append(comp)
+            for s in n.inbound:
+                comp = id_to_comp.get(s, "")
+                if comp and comp.lower() != c.name.lower() and comp not in called_by:
+                    called_by.append(comp)
+
         parts = "\n".join(f"- **{n.label}** — {n.summary}" for n in nodes_in)
         files = "\n".join(f"- `{f}`" for f in c.key_files)
-        body = c.responsibility
+
+        body = c.responsibility or f"The {c.name} component of {ctx.meta.name}."
         if c.tech:
             body += "\n\n**Tech:** " + ", ".join(f"`{t}`" for t in c.tech)
+        flow_lines = []
+        if called_by:
+            flow_lines.append("- **Called by:** " + ", ".join(called_by))
+        if calls:
+            flow_lines.append("- **Calls / depends on:** " + ", ".join(calls))
+        if flow_lines:
+            body += "\n\n**How it connects**\n" + "\n".join(flow_lines)
         if parts:
             body += "\n\n**Key parts**\n" + parts
         if files:
-            body += "\n\n**Key files**\n" + files
+            body += "\n\n**Key files to read first**\n" + files
         lessons.append(
             Lesson(
                 id=f"cmp-{c.id}",
@@ -90,6 +145,7 @@ def _compose(state: GraphState) -> dict:
                 tags=[c.kind] + c.tech[:2],
             )
         )
+
 
     # 3. Follow the data.
     lessons.append(

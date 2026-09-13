@@ -89,6 +89,16 @@ def run(state: GraphState) -> dict:
     reporter = state["reporter"]
     reporter.update("Researcher", "running", "Crawling repo from entry points & delegating files")
 
+    prefs = state.get("preferences")
+    custom = (getattr(prefs, "custom_instructions", "") or "").strip()
+    custom_block = (
+        "\nUSER'S CUSTOM INSTRUCTIONS (highest priority — tailor your analysis, "
+        "component focus and file assignments to satisfy these):\n"
+        f"{custom}\n"
+        if custom
+        else ""
+    )
+
     fallback = _heuristic(ctx)
     prompt = render(
         "researcher_user",
@@ -97,6 +107,7 @@ def run(state: GraphState) -> dict:
         description=ctx.meta.description or "(none)",
         languages=", ".join(ctx.meta.languages) or "unknown",
         filecount=ctx.meta.file_count,
+        custom_instructions=custom_block,
         tree=ctx.file_listing(900),
         anchors=ctx.anchor_sources(total_budget=150_000),
     )

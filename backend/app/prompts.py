@@ -75,7 +75,7 @@ RESEARCHER_USER = Template(
 Description: $description
 Languages: $languages
 Total files: $filecount
-
+$custom_instructions
 FULL FILE TREE:
 $tree
 
@@ -350,4 +350,5 @@ def render(name: str, **kwargs: object) -> str:
     # Shared blocks are always available to every template.
     kwargs.setdefault("grounding", GROUNDING)
     kwargs.setdefault("depth", DEPTH)
+    kwargs.setdefault("custom_instructions", "")
     return template.safe_substitute(**kwargs)

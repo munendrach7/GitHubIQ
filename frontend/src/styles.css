@@ -534,12 +534,21 @@ a {
 /* Draggable canvases (architecture + ER schema) */
 .canvas-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
 .btn.sm { padding: 7px 12px; font-size: 12.5px; }
+.canvas-frame { padding: 14px; }
+.canvas-tools { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.canvas-tools .icon-btn.sm { width: 30px; height: 30px; font-size: 16px; border-radius: 8px; }
+.zoom-label { min-width: 44px; text-align: center; font-size: 12.5px; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
 .drag-canvas {
-  position: relative; overflow: auto; padding: 0;
+  position: relative; overflow: hidden; padding: 0;
   min-height: 360px; touch-action: none;
   background-image: radial-gradient(var(--grid) 1px, transparent 1px);
   background-size: 22px 22px;
 }
+.canvas-viewport { height: 560px; overflow: hidden; cursor: grab; border-radius: 12px; }
+.canvas-viewport:active { cursor: grabbing; }
+.canvas-stage { position: absolute; top: 0; left: 0; transform-origin: 0 0; }
+.canvas-frame:fullscreen { padding: 18px; background: var(--bg); display: flex; flex-direction: column; }
+.canvas-frame:fullscreen .canvas-viewport { height: 100%; flex: 1; }
 .drag-edges { position: absolute; inset: 0; pointer-events: none; z-index: 0; overflow: visible; }
 .drag-node {
   position: absolute; z-index: 2; cursor: grab; user-select: none; touch-action: none;
@@ -589,15 +598,19 @@ a {
 .myguides-link { font-size: 12.5px; font-weight: 700; color: var(--blue); padding-right: 10px; border-right: 1px solid var(--border-soft); }
 .myguides-link:hover { color: var(--text); }
 
-/* Data-flow interactive rail */
-.flow-rail { display: flex; align-items: center; gap: 0; overflow-x: auto; padding: 4px 2px 14px; margin-bottom: 4px; }
-.rail-node { display: inline-flex; align-items: center; gap: 8px; padding: 10px 14px; border-radius: 12px; border: 1px solid var(--border); background: var(--panel-solid); color: var(--muted); cursor: pointer; white-space: nowrap; transition: all 0.15s; position: relative; }
-.rail-node.on { border-color: var(--blue); color: var(--text); box-shadow: 0 0 0 3px color-mix(in srgb, var(--blue) 18%, transparent); }
-.rail-node.done { color: var(--text); }
-.rail-num { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: 12px; color: #fff; background: linear-gradient(145deg,#0078d4,#8b5cf6); }
+/* Data-flow: vertical step rail on the left + detail on the right */
+.flow-layout { display: grid; grid-template-columns: 260px 1fr; gap: 16px; align-items: start; }
+.flow-rail-v { position: sticky; top: 16px; display: flex; flex-direction: column; gap: 4px; max-height: calc(100vh - 40px); overflow-y: auto; padding-right: 4px; }
+.rail-node-v { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--border); background: var(--panel-solid); color: var(--muted); cursor: pointer; text-align: left; transition: all 0.15s; position: relative; }
+.rail-node-v::before { content: ""; position: absolute; left: 23px; top: -4px; height: 4px; width: 2px; background: var(--border); }
+.rail-node-v:first-child::before { display: none; }
+.rail-node-v.on { border-color: var(--blue); color: var(--text); box-shadow: 0 0 0 3px color-mix(in srgb, var(--blue) 18%, transparent); }
+.rail-node-v.done { color: var(--text); }
+.rail-node-v-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.rail-node-v-label { font-size: 11.5px; color: var(--muted); line-height: 1.35; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.rail-num { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: 12px; color: #fff; background: linear-gradient(145deg,#0078d4,#8b5cf6); flex-shrink: 0; }
 .rail-num.async { background: linear-gradient(145deg,#8b5cf6,#d16ba5); }
-.rail-actor { font-weight: 600; font-size: 13.5px; }
-.rail-arrow { color: var(--dim); margin: 0 4px 0 12px; }
+.rail-actor { font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis; }
 .flow-active { animation: fadeUp 0.28s ease; }
 .flow-active-head { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
 .flow-nav { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 18px; }
@@ -652,10 +665,28 @@ a {
 .tree-caret { width: 14px; text-align: center; color: var(--dim); flex-shrink: 0; }
 .tree-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
+/* Custom instructions textarea (questionnaire) */
+.custom-instructions {
+  width: 100%; margin-top: 4px; padding: 12px 14px; border-radius: 12px;
+  border: 1px solid var(--border); background: var(--panel-solid); color: var(--text);
+  font-family: inherit; font-size: 14px; line-height: 1.55; resize: vertical; min-height: 92px;
+  transition: border-color 0.15s;
+}
+.custom-instructions:focus { outline: none; border-color: var(--amber); box-shadow: 0 0 0 3px color-mix(in srgb, var(--amber) 18%, transparent); }
+.custom-instructions::placeholder { color: var(--dim); }
+
+/* GitHub repo link chip in the guide */
+.repo-chip { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--border); background: var(--panel-solid); font-size: 12.5px; color: var(--muted); margin-bottom: 12px; transition: all 0.15s; }
+.repo-chip:hover { border-color: var(--amber); color: var(--text); }
+.repo-chip-ic { font-size: 14px; }
+.repo-chip-open { color: var(--dim); font-weight: 700; }
+
 /* ---------------- Responsive ---------------- */
 @media (max-width: 1080px) {
-  .arch-layout, .schema-layout, .walk-stage { grid-template-columns: 1fr; }
+  .arch-layout, .schema-layout, .walk-stage, .flow-layout { grid-template-columns: 1fr; }
   .arch-side, .walk-info, .schema-side { position: static; }
+  .flow-rail-v { position: static; max-height: none; flex-direction: row; flex-wrap: wrap; }
+  .rail-node-v::before { display: none; }
 }
 
 @media (max-width: 900px) {

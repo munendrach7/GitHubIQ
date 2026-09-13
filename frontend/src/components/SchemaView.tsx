@@ -1,6 +1,7 @@
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { Schema } from "../types";
 import { useDraggable } from "../hooks/useDraggable";
+import { useCanvasViewport } from "../hooks/useCanvasViewport";
 
 const CARD_W = 236;
 const GAP_X = 90;
@@ -19,7 +20,7 @@ interface Conn {
 }
 
 export default function SchemaView({ schema }: { schema: Schema }) {
-  const wrapRef = useRef<HTMLDivElement>(null);
+  const wrapRef = useRef<HTMLDivElement | null>(null);
   const cardRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const rowRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const [conns, setConns] = useState<Conn[]>([]);
@@ -42,7 +43,8 @@ export default function SchemaView({ schema }: { schema: Schema }) {
   }, [schema]);
 
   const resetKey = useMemo(() => tables.map((t) => t.name).join(","), [schema]);
-  const { pos, onDown, justDragged, reset } = useDraggable(initial, resetKey);
+  const vp = useCanvasViewport();
+  const { pos, onDown, justDragged, reset } = useDraggable(initial, resetKey, vp.zoomRef);
 
   // Build FK -> PK connections.
   const links = useMemo(() => {
@@ -84,7 +86,15 @@ export default function SchemaView({ schema }: { schema: Schema }) {
   const recompute = () => {
     const wrap = wrapRef.current;
     if (!wrap) return;
-    setSize({ w: Math.max(wrap.clientWidth, wrap.scrollWidth), h: Math.max(wrap.clientHeight, wrap.scrollHeight) });
+    let cw = 0;
+    let ch = 0;
+    for (const t of tables) {
+      const el = cardRefs.current[t.name];
+      if (!el) continue;
+      cw = Math.max(cw, el.offsetLeft + el.offsetWidth);
+      ch = Math.max(ch, el.offsetTop + el.offsetHeight);
+    }
+    setSize({ w: cw + PAD, h: ch + PAD });
     const rowMid = (tbl: string, col: string) => {
       const card = cardRefs.current[tbl];
       const row = rowRefs.current[`${tbl}::${col}`];
@@ -142,12 +152,28 @@ export default function SchemaView({ schema }: { schema: Schema }) {
   return (
     <div className="schema-layout">
       <div>
-        <div className="canvas-toolbar">
-          <span className="dim" style={{ fontSize: 12.5 }}>🖐️ Drag tables to arrange · lines link foreign keys to their table</span>
-          <button className="btn ghost sm" onClick={reset}>⟲ Reset layout</button>
-        </div>
-        <div className="glass drag-canvas er-canvas" ref={wrapRef} style={{ height: canvasH }}>
-          <svg className="drag-edges" width={size.w} height={size.h}>
+        <div className="canvas-frame glass" ref={vp.frameRef}>
+          <div className="canvas-toolbar">
+            <span className="dim" style={{ fontSize: 12.5 }}>🖐️ Drag to pan · scroll to zoom · drag a table to move it</span>
+            <div className="canvas-tools">
+              <button className="icon-btn sm" title="Zoom out" onClick={vp.zoomOut}>−</button>
+              <span className="zoom-label">{Math.round(vp.zoom * 100)}%</span>
+              <button className="icon-btn sm" title="Zoom in" onClick={vp.zoomIn}>+</button>
+              <button className="btn ghost sm" onClick={vp.resetView}>⟲ View</button>
+              <button className="btn ghost sm" onClick={reset}>⟲ Layout</button>
+              <button className="btn ghost sm" onClick={vp.toggleFullscreen}>{vp.fullscreen ? "✕ Exit" : "⛶ Fullscreen"}</button>
+            </div>
+          </div>
+          <div
+            className="drag-canvas er-canvas canvas-viewport"
+            ref={(el) => { wrapRef.current = el; vp.viewportRef.current = el; }}
+            onPointerDown={vp.onBackgroundPointerDown}
+          >
+            <div
+              className="canvas-stage"
+              style={{ width: size.w || undefined, height: size.h || canvasH, transform: `translate(${vp.pan.x}px, ${vp.pan.y}px) scale(${vp.zoom})` }}
+            >
+              <svg className="drag-edges" width={size.w} height={size.h}>
             <defs>
               <marker id="er-dot" markerWidth="8" markerHeight="8" refX="4" refY="4">
                 <circle cx="4" cy="4" r="3" fill="var(--purple)" />
@@ -202,6 +228,8 @@ export default function SchemaView({ schema }: { schema: Schema }) {
               </div>
             );
           })}
+            </div>
+          </div>
         </div>
       </div>
 

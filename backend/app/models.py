@@ -52,6 +52,8 @@ class Preferences(BaseModel):
     familiarity: Familiarity = Familiarity.some_exposure
     goals: list[str] = Field(default_factory=list)
     depth: Depth = Depth.guided
+    # Free-form guidance the user types to steer the researcher agent.
+    custom_instructions: str = ""
 
 
 class AnalyzeRequest(BaseModel):

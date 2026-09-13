@@ -10,7 +10,11 @@ export interface XY {
  * Works with mouse and touch. Distinguishes a click from a drag via a 4px
  * threshold so nodes stay clickable.
  */
-export function useDraggable(initial: Record<string, XY>, resetKey: string) {
+export function useDraggable(
+  initial: Record<string, XY>,
+  resetKey: string,
+  scaleRef?: React.MutableRefObject<number>
+) {
   const [pos, setPos] = useState<Record<string, XY>>(initial);
   const initialRef = useRef(initial);
 
@@ -39,8 +43,9 @@ export function useDraggable(initial: Record<string, XY>, resetKey: string) {
     const move = (e: PointerEvent) => {
       const d = drag.current;
       if (!d) return;
-      const dx = e.clientX - d.sx;
-      const dy = e.clientY - d.sy;
+      const scale = scaleRef?.current || 1;
+      const dx = (e.clientX - d.sx) / scale;
+      const dy = (e.clientY - d.sy) / scale;
       if (Math.abs(dx) + Math.abs(dy) > 4) {
         d.moved = true;
         movedRef.current = true;

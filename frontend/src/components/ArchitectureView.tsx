@@ -1,6 +1,7 @@
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { Architecture, ServiceNode } from "../types";
 import { useDraggable } from "../hooks/useDraggable";
+import { useCanvasViewport } from "../hooks/useCanvasViewport";
 
 const KIND_COLOR: Record<string, string> = {
   request: "var(--blue)",
@@ -29,7 +30,7 @@ interface Edge2 {
 }
 
 export default function ArchitectureView({ arch }: { arch: Architecture }) {
-  const wrapRef = useRef<HTMLDivElement>(null);
+  const wrapRef = useRef<HTMLDivElement | null>(null);
   const nodeRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const [edges, setEdges] = useState<Edge2[]>([]);
   const [selected, setSelected] = useState<ServiceNode | null>(null);
@@ -54,13 +55,21 @@ export default function ArchitectureView({ arch }: { arch: Architecture }) {
   }, [arch]);
 
   const resetKey = useMemo(() => arch.nodes.map((n) => n.id).join(","), [arch]);
-  const { pos, onDown, justDragged, reset } = useDraggable(initial, resetKey);
+  const vp = useCanvasViewport();
+  const { pos, onDown, justDragged, reset } = useDraggable(initial, resetKey, vp.zoomRef);
 
   const recompute = () => {
     const wrap = wrapRef.current;
     if (!wrap) return;
-    const box = wrap.getBoundingClientRect();
-    setSize({ w: Math.max(box.width, wrap.scrollWidth), h: Math.max(box.height, wrap.scrollHeight) });
+    let cw = 0;
+    let ch = 0;
+    for (const n of arch.nodes) {
+      const el = nodeRefs.current[n.id];
+      if (!el) continue;
+      cw = Math.max(cw, el.offsetLeft + el.offsetWidth);
+      ch = Math.max(ch, el.offsetTop + el.offsetHeight);
+    }
+    setSize({ w: cw + PAD, h: ch + PAD });
     const c: Record<string, { x: number; y: number }> = {};
     for (const n of arch.nodes) {
       const el = nodeRefs.current[n.id];
@@ -110,12 +119,28 @@ export default function ArchitectureView({ arch }: { arch: Architecture }) {
   return (
     <div className="arch-layout">
       <div>
-        <div className="canvas-toolbar">
-          <span className="dim" style={{ fontSize: 12.5 }}>🖐️ Drag components to rearrange · tap to inspect</span>
-          <button className="btn ghost sm" onClick={reset}>⟲ Reset layout</button>
-        </div>
-        <div className="glass drag-canvas" ref={wrapRef} style={{ height: canvasH }}>
-          <svg className="drag-edges" width={size.w} height={size.h}>
+        <div className="canvas-frame glass" ref={vp.frameRef}>
+          <div className="canvas-toolbar">
+            <span className="dim" style={{ fontSize: 12.5 }}>🖐️ Drag to pan · scroll to zoom · drag a box to move it</span>
+            <div className="canvas-tools">
+              <button className="icon-btn sm" title="Zoom out" onClick={vp.zoomOut}>−</button>
+              <span className="zoom-label">{Math.round(vp.zoom * 100)}%</span>
+              <button className="icon-btn sm" title="Zoom in" onClick={vp.zoomIn}>+</button>
+              <button className="btn ghost sm" onClick={vp.resetView}>⟲ View</button>
+              <button className="btn ghost sm" onClick={reset}>⟲ Layout</button>
+              <button className="btn ghost sm" onClick={vp.toggleFullscreen}>{vp.fullscreen ? "✕ Exit" : "⛶ Fullscreen"}</button>
+            </div>
+          </div>
+          <div
+            className="drag-canvas canvas-viewport"
+            ref={(el) => { wrapRef.current = el; vp.viewportRef.current = el; }}
+            onPointerDown={vp.onBackgroundPointerDown}
+          >
+            <div
+              className="canvas-stage"
+              style={{ width: size.w || undefined, height: size.h || canvasH, transform: `translate(${vp.pan.x}px, ${vp.pan.y}px) scale(${vp.zoom})` }}
+            >
+              <svg className="drag-edges" width={size.w} height={size.h}>
             <defs>
               <marker id="ah" markerWidth="9" markerHeight="9" refX="7" refY="3"
                 orient="auto" markerUnits="userSpaceOnUse">
@@ -172,6 +197,8 @@ export default function ArchitectureView({ arch }: { arch: Architecture }) {
               </div>
             );
           })}
+            </div>
+          </div>
         </div>
       </div>
 

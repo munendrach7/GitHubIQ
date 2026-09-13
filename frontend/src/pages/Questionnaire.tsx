@@ -46,6 +46,7 @@ export default function Questionnaire() {
   const [familiarity, setFamiliarity] = useState<Familiarity>("some_exposure");
   const [goals, setGoals] = useState<string[]>(["Request & data flow"]);
   const [depth, setDepth] = useState<Depth>("guided");
+  const [customInstructions, setCustomInstructions] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const cooling = user && !user.is_admin && !user.rate?.can_generate;
@@ -84,7 +85,11 @@ export default function Questionnaire() {
     setError("");
     try {
       const scope = scopeMode === "folder" ? scopePath : "";
-      const res = await startAnalysis(repo, { role, familiarity, goals, depth }, scope);
+      const res = await startAnalysis(
+        repo,
+        { role, familiarity, goals, depth, custom_instructions: customInstructions.trim() },
+        scope
+      );
       await refreshRate();
       nav(`/analysis/${res.id}`);
     } catch (e) {
@@ -214,6 +219,21 @@ export default function Questionnaire() {
             <p>{d.desc}</p>
           </div>
         ))}
+      </div>
+
+      <div className="field-label">
+        📝 Custom instructions <small>— optional; steer the researcher for more personalized results</small>
+      </div>
+      <textarea
+        className="custom-instructions"
+        value={customInstructions}
+        onChange={(e) => setCustomInstructions(e.target.value)}
+        placeholder="e.g. Focus on the authentication flow and how background jobs are scheduled. I care most about the payment service and its database."
+        rows={4}
+        maxLength={1500}
+      />
+      <div className="dim" style={{ fontSize: 12, marginTop: 4, textAlign: "right" }}>
+        {customInstructions.length}/1500
       </div>
 
       {cooling && (

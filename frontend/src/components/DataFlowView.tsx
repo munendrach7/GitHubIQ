@@ -19,85 +19,91 @@ export default function DataFlowView({ flow }: { flow: DataFlow }) {
         )}
         <p>{flow.summary}</p>
         <p className="dim" style={{ fontSize: 13, marginTop: 4 }}>
-          Click a step on the rail — or press Next — to walk the request through the system.
+          Pick a step on the left — or press Next — to walk the request through the system.
         </p>
       </div>
 
-      {/* Interactive flow rail */}
-      <div className="flow-rail">
-        {flow.steps.map((s, i) => (
-          <button
-            key={s.index}
-            className={`rail-node ${i === active ? "on" : ""} ${i < active ? "done" : ""}`}
-            onClick={() => setActive(i)}
-          >
-            <span className={`rail-num ${s.kind}`}>{s.index}</span>
-            <span className="rail-actor">{s.actor}</span>
-            {i < flow.steps.length - 1 && <span className="rail-arrow">→</span>}
-          </button>
-        ))}
-      </div>
-
-      {/* Active step detail */}
-      <div className="glass card flow-active" key={step.index}>
-        <div className="flow-active-head">
-          <span className={`flow-idx ${step.kind}`}>{step.index}</span>
-          <div>
-            <div className="flow-actor">{step.actor}</div>
-            <div className="muted">{step.label}</div>
-          </div>
-          <span className={`tag ${step.kind === "async" ? "purple" : "blue"}`} style={{ marginLeft: "auto" }}>{step.kind}</span>
+      <div className="flow-layout">
+        {/* Vertical step rail */}
+        <div className="flow-rail-v">
+          {flow.steps.map((s, i) => (
+            <button
+              key={s.index}
+              className={`rail-node-v ${i === active ? "on" : ""} ${i < active ? "done" : ""}`}
+              onClick={() => setActive(i)}
+            >
+              <span className={`rail-num ${s.kind}`}>{s.index}</span>
+              <span className="rail-node-v-text">
+                <span className="rail-actor">{s.actor}</span>
+                {s.label && <span className="rail-node-v-label">{s.label}</span>}
+              </span>
+            </button>
+          ))}
         </div>
 
-        {step.detail && <p className="flow-detail">{step.detail}</p>}
-
-        {(step.data_in || step.data_out) && (
-          <div className="flow-data">
-            <div className="flow-data-cell">
-              <div className="io-label">Data in</div>
-              <code className="mono">{step.data_in || "—"}</code>
+        <div className="flow-main">
+          {/* Active step detail */}
+          <div className="glass card flow-active" key={step.index}>
+            <div className="flow-active-head">
+              <span className={`flow-idx ${step.kind}`}>{step.index}</span>
+              <div>
+                <div className="flow-actor">{step.actor}</div>
+                <div className="muted">{step.label}</div>
+              </div>
+              <span className={`tag ${step.kind === "async" ? "purple" : "blue"}`} style={{ marginLeft: "auto" }}>{step.kind}</span>
             </div>
-            <div className="flow-data-arrow">→</div>
-            <div className="flow-data-cell">
-              <div className="io-label">Data out</div>
-              <code className="mono">{step.data_out || "—"}</code>
+
+            {step.detail && <p className="flow-detail">{step.detail}</p>}
+
+            {(step.data_in || step.data_out) && (
+              <div className="flow-data">
+                <div className="flow-data-cell">
+                  <div className="io-label">Data in</div>
+                  <code className="mono">{step.data_in || "—"}</code>
+                </div>
+                <div className="flow-data-arrow">→</div>
+                <div className="flow-data-cell">
+                  <div className="io-label">Data out</div>
+                  <code className="mono">{step.data_out || "—"}</code>
+                </div>
+              </div>
+            )}
+
+            {step.code && <pre className="mono flow-code">{step.code}</pre>}
+
+            {(step.files || []).length > 0 && (
+              <div className="flow-files">
+                <span className="io-label" style={{ marginRight: 4 }}>Files:</span>
+                {step.files.map((f) => <span key={f} className="tag green mono">{f}</span>)}
+              </div>
+            )}
+
+            <div className="flow-nav">
+              <button className="btn ghost" disabled={atStart} onClick={() => setActive(active - 1)}>← Previous</button>
+              <span className="dim">{active + 1} of {flow.steps.length}</span>
+              <button className="btn accent" disabled={atEnd} onClick={() => setActive(active + 1)}>Next step →</button>
             </div>
           </div>
-        )}
 
-        {step.code && <pre className="mono flow-code">{step.code}</pre>}
-
-        {(step.files || []).length > 0 && (
-          <div className="flow-files">
-            <span className="io-label" style={{ marginRight: 4 }}>Files:</span>
-            {step.files.map((f) => <span key={f} className="tag green mono">{f}</span>)}
+          <div className="grid-2" style={{ marginTop: 16 }}>
+            {flow.rationale && (
+              <div className="glass card">
+                <h4>🧠 Why it's built this way</h4>
+                <p>{flow.rationale}</p>
+              </div>
+            )}
+            {(flow.alternatives || []).length > 0 && (
+              <div className="glass card">
+                <h4>🔀 Other notable flows</h4>
+                <ul style={{ margin: "8px 0 0 18px" }}>
+                  {flow.alternatives.map((a) => (
+                    <li key={a} style={{ margin: "4px 0", color: "var(--muted)" }}>{a}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
-        )}
-
-        <div className="flow-nav">
-          <button className="btn ghost" disabled={atStart} onClick={() => setActive(active - 1)}>← Previous</button>
-          <span className="dim">{active + 1} of {flow.steps.length}</span>
-          <button className="btn accent" disabled={atEnd} onClick={() => setActive(active + 1)}>Next step →</button>
         </div>
-      </div>
-
-      <div className="grid-2" style={{ marginTop: 16 }}>
-        {flow.rationale && (
-          <div className="glass card">
-            <h4>🧠 Why it's built this way</h4>
-            <p>{flow.rationale}</p>
-          </div>
-        )}
-        {(flow.alternatives || []).length > 0 && (
-          <div className="glass card">
-            <h4>🔀 Other notable flows</h4>
-            <ul style={{ margin: "8px 0 0 18px" }}>
-              {flow.alternatives.map((a) => (
-                <li key={a} style={{ margin: "4px 0", color: "var(--muted)" }}>{a}</li>
-              ))}
-            </ul>
-          </div>
-        )}
       </div>
     </div>
   );

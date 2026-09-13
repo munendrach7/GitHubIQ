@@ -45,6 +45,11 @@ export default function GuideView({ result }: { result: AnalysisResult }) {
       </div>
 
       <div className="guide-main">
+        <a className="repo-chip" href={result.repo_url} target="_blank" rel="noreferrer">
+          <span className="repo-chip-ic">🐙</span>
+          <span className="mono">{result.repo.owner}/{result.repo.name}</span>
+          <span className="repo-chip-open">↗</span>
+        </a>
         <div className="muted" style={{ fontSize: 13 }}>
           {active?.section} / <b style={{ color: "var(--text)" }}>{active?.title}</b>
         </div>
