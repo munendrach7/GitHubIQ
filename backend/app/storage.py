@@ -113,7 +113,7 @@ class MemoryStore(Store):
 
 class CosmosStore(Store):
     def __init__(self) -> None:
-        from azure.cosmos import CosmosClient, PartitionKey
+        from azure.cosmos import CosmosClient
 
         settings = get_settings()
         if settings.cosmos_key:
@@ -127,15 +127,12 @@ class CosmosStore(Store):
             client = CosmosClient(
                 settings.cosmos_endpoint, credential=get_credential()
             )
-        db = client.create_database_if_not_exists(settings.cosmos_database)
-        self._container = db.create_container_if_not_exists(
-            id=settings.cosmos_container,
-            partition_key=PartitionKey(path="/id"),
-        )
-        self._users = db.create_container_if_not_exists(
-            id="users",
-            partition_key=PartitionKey(path="/id"),
-        )
+        # The database and containers are provisioned by Terraform; only
+        # *reference* them here so the app needs just data-plane RBAC (creating
+        # them would require control-plane rights the managed identity lacks).
+        db = client.get_database_client(settings.cosmos_database)
+        self._container = db.get_container_client(settings.cosmos_container)
+        self._users = db.get_container_client("users")
 
     def upsert(self, result: AnalysisResult) -> None:
         self._container.upsert_item(result.as_document())

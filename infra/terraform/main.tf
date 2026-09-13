@@ -125,6 +125,14 @@ resource "azurerm_cosmosdb_sql_container" "analyses" {
   partition_key_paths = ["/id"]
 }
 
+resource "azurerm_cosmosdb_sql_container" "users" {
+  name                = "users"
+  resource_group_name = data.azurerm_resource_group.rg.name
+  account_name        = azurerm_cosmosdb_account.cosmos.name
+  database_name       = azurerm_cosmosdb_sql_database.db.name
+  partition_key_paths = ["/id"]
+}
+
 # ---------------------------------------------------------------------------
 # Service Bus — async job queue between the API and the worker(s). Keyless:
 # local (SAS) auth is disabled, so every client authenticates with Entra.
