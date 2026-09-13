@@ -1,18 +1,20 @@
-name: Deploy infrastructure (Bicep)
+name: Deploy infrastructure (Terraform)
 
-# Provisions/updates the Azure infrastructure defined in infra/main.bicep
-# (Container Apps environment + apps, Azure OpenAI, Cosmos DB, Log Analytics).
+# Provisions/updates the Azure infrastructure defined in infra/terraform
+# (Container Apps env + backend/worker/frontend, Azure OpenAI, Cosmos DB,
+# Service Bus, Log Analytics, managed identity + role assignments).
 #
 # Authentication uses Entra Workload Identity Federation (OIDC) — NO secrets or
 # tokens are stored in the repository. Configure these repo secrets once:
 #   AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID
-# Optional repo variables: AZURE_RESOURCE_GROUP, AZURE_LOCATION
+# Optional repo variables: AZURE_RESOURCE_GROUP, AZURE_LOCATION,
+#   TFSTATE_RESOURCE_GROUP, TFSTATE_STORAGE_ACCOUNT
 
 on:
   push:
     branches: [main]
     paths:
-      - "infra/**"
+      - "infra/terraform/**"
       - ".github/workflows/deploy-infra.yml"
   workflow_dispatch:
 
@@ -23,10 +25,21 @@ permissions:
 env:
   RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP || 'rg-githubiq' }}
   LOCATION: ${{ vars.AZURE_LOCATION || 'eastus2' }}
+  TFSTATE_RG: ${{ vars.TFSTATE_RESOURCE_GROUP || 'rg-githubiq-tfstate' }}
+  TFSTATE_CONTAINER: tfstate
+  TFSTATE_KEY: githubiq.tfstate
+  # Terraform reads Azure auth from these (OIDC — no client secret).
+  ARM_USE_OIDC: "true"
+  ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+  ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+  ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
 jobs:
   provision:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra/terraform
     steps:
       - uses: actions/checkout@v4
 
@@ -37,11 +50,45 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Ensure resource group
-        run: az group create -n "$RESOURCE_GROUP" -l "$LOCATION" -o none
+      - name: Bootstrap Terraform remote state (idempotent)
+        working-directory: .
+        run: |
+          set -euo pipefail
+          SA="${{ vars.TFSTATE_STORAGE_ACCOUNT }}"
+          if [ -z "$SA" ]; then
+            # Derive a globally-unique, stable account name from the subscription id.
+            SA="giqtf$(printf '%s' "$ARM_SUBSCRIPTION_ID" | sha1sum | cut -c1-16)"
+          fi
+          echo "TFSTATE_SA=$SA" >> "$GITHUB_ENV"
+          az group create -n "$TFSTATE_RG" -l "$LOCATION" -o none
+          az storage account create -n "$SA" -g "$TFSTATE_RG" -l "$LOCATION" \
+            --sku Standard_LRS --allow-blob-public-access false -o none
+          KEY="$(az storage account keys list -n "$SA" -g "$TFSTATE_RG" --query '[0].value' -o tsv)"
+          echo "::add-mask::$KEY"
+          echo "ARM_ACCESS_KEY=$KEY" >> "$GITHUB_ENV"
+          az storage container create -n "$TFSTATE_CONTAINER" --account-name "$SA" \
+            --account-key "$KEY" -o none
 
-      - name: Validate Bicep
-        run: az deployment group validate -g "$RESOURCE_GROUP" -f infra/main.bicep
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.15.6
 
-      - name: Deploy Bicep
-        run: az deployment group create -g "$RESOURCE_GROUP" -f infra/main.bicep -o table
+      - name: Terraform init
+        run: |
+          terraform init -input=false \
+            -backend-config="resource_group_name=$TFSTATE_RG" \
+            -backend-config="storage_account_name=$TFSTATE_SA" \
+            -backend-config="container_name=$TFSTATE_CONTAINER" \
+            -backend-config="key=$TFSTATE_KEY"
+
+      - name: Terraform validate
+        run: terraform validate
+
+      - name: Terraform plan
+        run: |
+          terraform plan -input=false -out=tfplan \
+            -var="resource_group_name=$RESOURCE_GROUP" \
+            -var="location=$LOCATION"
+
+      - name: Terraform apply
+        run: terraform apply -input=false -auto-approve tfplan

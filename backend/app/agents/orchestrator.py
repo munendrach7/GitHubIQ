@@ -7,6 +7,10 @@ Flow:  Researcher → (Architect ∥ Schema ∥ Tutor)
 from __future__ import annotations
 
 import logging
+from concurrent.futures import (
+    ThreadPoolExecutor,
+    TimeoutError as FuturesTimeoutError,
+)
 
 from ..llm import llm_available
 from ..models import (
@@ -217,15 +221,29 @@ def _compose(state: GraphState) -> dict:
 
 
 def _guard(fn):
-    """Wrap a graph node so cancellation is checked before it runs.
+    """Wrap a graph node so the *whole* pipeline is cancellable, not just Deep-Dive.
 
-    Gives us a cancellation checkpoint at every node boundary; combined with the
-    in-loop checks inside the Deep-Dive agent, a cancelled run stops promptly
-    instead of grinding through the remaining agents.
+    The node runs in a worker thread while this loop polls the cancel flag every
+    second. A cancel that lands mid-node — even during a blocking LLM call in the
+    Researcher, Architect, Schema, Data-Flow, Tutor or Presenter — aborts the run
+    within ~1s by raising :class:`PipelineCancelled`; the abandoned thread is left
+    to unwind on its own so we never block on the stalled call.
     """
     def wrapped(state: GraphState) -> dict:
-        check_cancelled(state["reporter"])
-        return fn(state)
+        reporter = state["reporter"]
+        check_cancelled(reporter)
+        ex = ThreadPoolExecutor(max_workers=1)
+        fut = ex.submit(fn, state)
+        try:
+            while True:
+                if reporter.cancelled():
+                    raise PipelineCancelled()
+                try:
+                    return fut.result(timeout=1.0)
+                except FuturesTimeoutError:
+                    continue
+        finally:
+            ex.shutdown(wait=False, cancel_futures=True)
 
     wrapped.__name__ = getattr(fn, "__name__", "node")
     return wrapped

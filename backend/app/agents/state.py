@@ -62,7 +62,7 @@ class ProgressReporter:
         self._cancel_check = cancel_check
         self._cancel_latched = False
         self._last_poll = 0.0
-        self._poll_interval = 2.0  # seconds between external cancel-flag reads
+        self._poll_interval = 1.0  # seconds between external cancel-flag reads
 
     @property
     def result(self) -> AnalysisResult:

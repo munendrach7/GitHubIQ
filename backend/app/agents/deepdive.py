@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import logging
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 
 from ..compaction import compact_files
 from ..llm import invoke_json
@@ -142,31 +142,35 @@ def run(state: GraphState) -> dict:
             c.name: _heuristic_body(c, *_connections(arch, c.name)) for c in components
         }
         workers = min(_MAX_WORKERS, len(components))
-        deadline = time.monotonic() + max(30, scale.deepdive_deadline)
+        phase_end = time.monotonic() + max(30, scale.deepdive_deadline)
         ex = ThreadPoolExecutor(max_workers=workers)
+        futures = {ex.submit(work, c): c for c in components}
+        pending = set(futures)
         try:
-            futures = {ex.submit(work, c): c for c in components}
-            for fut in as_completed(futures):
-                # Honour a user cancellation as soon as one lands.
+            # Poll in short slices with wait() rather than blocking on a single
+            # future: this both (a) stops the phase hanging if every call stalls
+            # (what pinned runs at 75%) and (b) honours a user cancel within ~2s
+            # even while calls are still in flight, so a worker stops promptly.
+            while pending:
                 if reporter.cancelled():
                     break
-                remaining = deadline - time.monotonic()
-                if remaining <= 0:
+                if time.monotonic() >= phase_end:
                     logger.warning(
-                        "Deep-Dive deadline (%ss) reached; filling remainder heuristically",
-                        scale.deepdive_deadline,
+                        "Deep-Dive deadline reached; filling remainder heuristically"
                     )
                     break
-                comp = futures[fut]
-                try:
-                    name, body = fut.result(timeout=max(1, remaining))
-                except Exception as exc:  # noqa: BLE001 - degrade to heuristic body
-                    logger.error("Deep-Dive failed for %s: %s", comp.name, exc)
-                    name, body = comp.name, fallbacks[comp.name]
-                deepdives[name] = body
-                reporter.update(
-                    "Deep-Dive", "running", f"deep dive: {name} ({len(deepdives)})"
-                )
+                done, pending = wait(pending, timeout=2, return_when=FIRST_COMPLETED)
+                for fut in done:
+                    comp = futures[fut]
+                    try:
+                        name, body = fut.result()
+                    except Exception as exc:  # noqa: BLE001 - degrade to heuristic body
+                        logger.error("Deep-Dive failed for %s: %s", comp.name, exc)
+                        name, body = comp.name, fallbacks[comp.name]
+                    deepdives[name] = body
+                    reporter.update(
+                        "Deep-Dive", "running", f"deep dive: {name} ({len(deepdives)})"
+                    )
         finally:
             # Never block the pipeline on stragglers — abandon them and move on.
             ex.shutdown(wait=False, cancel_futures=True)
