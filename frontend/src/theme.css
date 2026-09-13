@@ -1,0 +1,51 @@
+/* GitHubIQ theme tokens — GitHub dark + light, switchable via [data-theme]. */
+:root,
+[data-theme="dark"] {
+  --bg: #0d1117;
+  --bg-2: #010409;
+  --panel: rgba(22, 27, 34, 0.72);
+  --panel-solid: #161b22;
+  --border: #30363d;
+  --border-soft: rgba(240, 246, 252, 0.08);
+  --text: #e6edf3;
+  --muted: #8b949e;
+  --dim: #6e7681;
+  --blue: #58a6ff;
+  --green: #3fb950;
+  --purple: #bc8cff;
+  --pink: #f778ba;
+  --orange: #f0883e;
+  --yellow: #e3b341;
+  --cyan: #56d4dd;
+  --grid: rgba(240, 246, 252, 0.03);
+  --glow-1: rgba(88, 166, 255, 0.14);
+  --glow-2: rgba(188, 140, 255, 0.14);
+  --glow-3: rgba(63, 185, 80, 0.1);
+  --code-bg: #010409;
+  --radius: 16px;
+}
+
+[data-theme="light"] {
+  --bg: #ffffff;
+  --bg-2: #f6f8fa;
+  --panel: rgba(255, 255, 255, 0.85);
+  --panel-solid: #ffffff;
+  --border: #d0d7de;
+  --border-soft: rgba(27, 31, 36, 0.12);
+  --text: #1f2328;
+  --muted: #636c76;
+  --dim: #818b98;
+  --blue: #0969da;
+  --green: #1a7f37;
+  --purple: #8250df;
+  --pink: #bf3989;
+  --orange: #bc4c00;
+  --yellow: #9a6700;
+  --cyan: #1b7c83;
+  --grid: rgba(27, 31, 36, 0.04);
+  --glow-1: rgba(9, 105, 218, 0.1);
+  --glow-2: rgba(130, 80, 223, 0.1);
+  --glow-3: rgba(26, 127, 55, 0.08);
+  --code-bg: #f6f8fa;
+}
+

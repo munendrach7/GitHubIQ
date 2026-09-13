@@ -1,0 +1,70 @@
+name: Deploy app (backend + frontend)
+
+# Builds the container images in Azure Container Registry and rolls out new
+# revisions to the two Azure Container Apps.
+#
+# Authentication uses Entra Workload Identity Federation (OIDC) — NO secrets or
+# tokens are stored in the repository. Configure these repo secrets once:
+#   AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID
+# and (optionally) repo variables to override the defaults below:
+#   AZURE_RESOURCE_GROUP, AZURE_ACR_NAME, BACKEND_APP, FRONTEND_APP
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - "frontend/**"
+      - ".github/workflows/deploy-app.yml"
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP || 'rg-githubiq' }}
+  ACR_NAME: ${{ vars.AZURE_ACR_NAME }}
+  BACKEND_APP: ${{ vars.BACKEND_APP || 'giq-backend' }}
+  FRONTEND_APP: ${{ vars.FRONTEND_APP || 'giq-frontend' }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Resolve ACR name
+        run: |
+          if [ -z "$ACR_NAME" ]; then
+            ACR_NAME=$(az acr list -g "$RESOURCE_GROUP" --query "[0].name" -o tsv)
+          fi
+          echo "ACR_NAME=$ACR_NAME" >> "$GITHUB_ENV"
+          echo "ACR_SERVER=$(az acr show -n "$ACR_NAME" -g "$RESOURCE_GROUP" --query loginServer -o tsv)" >> "$GITHUB_ENV"
+
+      - name: Build backend image in ACR
+        run: az acr build -r "$ACR_NAME" -t githubiq-backend:${{ github.sha }} -t githubiq-backend:latest ./backend
+
+      - name: Build frontend image in ACR
+        run: az acr build -r "$ACR_NAME" -t githubiq-frontend:${{ github.sha }} -t githubiq-frontend:latest ./frontend
+
+      - name: Update backend container app
+        run: |
+          az containerapp update -n "$BACKEND_APP" -g "$RESOURCE_GROUP" \
+            --image "$ACR_SERVER/githubiq-backend:${{ github.sha }}"
+
+      - name: Update frontend container app
+        run: |
+          az containerapp update -n "$FRONTEND_APP" -g "$RESOURCE_GROUP" \
+            --image "$ACR_SERVER/githubiq-frontend:${{ github.sha }}"
+
+      - name: Output URLs
+        run: |
+          echo "Frontend: https://$(az containerapp show -n "$FRONTEND_APP" -g "$RESOURCE_GROUP" --query properties.configuration.ingress.fqdn -o tsv)"

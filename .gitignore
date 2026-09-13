@@ -1,0 +1,36 @@
+# Environment / secrets — never commit real credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.pfx
+
+# Python
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+backend/.venv/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node / frontend
+node_modules/
+**/node_modules/
+frontend/dist/
+dist/
+*.log
+npm-debug.log*
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+.idea/
+
+# Azure / local tooling
+.azure/
+*.tmp
