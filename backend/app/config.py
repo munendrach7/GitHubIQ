@@ -79,6 +79,11 @@ class Settings(BaseSettings):
     max_files_scanned: int = 600
     max_file_bytes: int = 120_000
 
+    # Janitor: a worker background task deletes terminal analyses and cancel
+    # intents older than ``cleanup_after_hours``, running every interval.
+    cleanup_after_hours: float = 48.0
+    janitor_interval_minutes: float = 60.0
+
     @property
     def admin_password_hash(self) -> str:
         import hashlib

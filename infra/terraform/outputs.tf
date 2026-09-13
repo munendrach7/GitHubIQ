@@ -18,6 +18,14 @@ output "AZURE_CLIENT_ID" {
   value = azurerm_user_assigned_identity.app.client_id
 }
 
+output "ACR_NAME" {
+  value = azurerm_container_registry.acr.name
+}
+
+output "ACR_LOGIN_SERVER" {
+  value = azurerm_container_registry.acr.login_server
+}
+
 output "BACKEND_FQDN" {
   value = azurerm_container_app.backend.ingress[0].fqdn
 }

@@ -25,6 +25,8 @@ import json
 import logging
 import signal
 import sys
+import threading
+import time
 
 from .agents.orchestrator import run_pipeline
 from .config import get_settings
@@ -37,6 +39,27 @@ logger = logging.getLogger("githubiq.worker")
 
 _TERMINAL = {AnalysisStatus.done, AnalysisStatus.error, AnalysisStatus.cancelled}
 _shutdown = False
+_stop_event = threading.Event()
+
+
+def _run_janitor() -> None:
+    """Periodically delete terminal analyses and cancel intents older than the
+    configured age (default 2 days) so the store doesn't grow without bound."""
+    settings = get_settings()
+    interval = max(60.0, settings.janitor_interval_minutes * 60.0)
+    max_age = settings.cleanup_after_hours * 3600.0
+    store = get_store()
+    logger.info(
+        "Janitor started; purging terminal jobs + cancel intents older than %.0fh every %.0fm",
+        settings.cleanup_after_hours, settings.janitor_interval_minutes,
+    )
+    while not _stop_event.wait(interval):
+        try:
+            removed = store.cleanup(time.time() - max_age)
+            if removed:
+                logger.info("Janitor removed %d old record(s)", removed)
+        except Exception as exc:  # noqa: BLE001 - never let cleanup kill the worker
+            logger.error("Janitor cleanup failed: %s", exc)
 
 
 def _process(analysis_id: str) -> None:
@@ -49,7 +72,7 @@ def _process(analysis_id: str) -> None:
     if result.status in _TERMINAL:
         logger.info("Job %s already %s; skipping", analysis_id, result.status)
         return
-    if result.cancel_requested:
+    if store.is_cancel_requested(analysis_id) or result.cancel_requested:
         logger.info("Job %s cancelled before start", analysis_id)
         result.status = AnalysisStatus.cancelled
         result.error = "Cancelled by user."
@@ -117,6 +140,9 @@ def run_worker() -> None:
         settings.servicebus_queue, settings.job_max_attempts,
     )
 
+    # Background cleanup of old completed runs and stale cancel intents.
+    threading.Thread(target=_run_janitor, name="janitor", daemon=True).start()
+
     with client:
         receiver = client.get_queue_receiver(
             queue_name=settings.servicebus_queue, max_wait_time=30
@@ -171,6 +197,7 @@ def _install_signal_handlers() -> None:
         global _shutdown
         logger.info("Received signal %s; shutting down after current message.", signum)
         _shutdown = True
+        _stop_event.set()
 
     for sig in (signal.SIGINT, signal.SIGTERM):
         try:

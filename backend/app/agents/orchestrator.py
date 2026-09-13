@@ -291,8 +291,8 @@ def run_pipeline(
     running in a different process.
     """
     def _flag_check() -> bool:
-        fresh = store.get(result.id)
-        return bool(fresh and fresh.cancel_requested)
+        # Poll the separate cancel-intent record (never clobbered by progress writes).
+        return store.is_cancel_requested(result.id)
 
     reporter = ProgressReporter(
         result, store, cancel_event=cancel_event, cancel_check=_flag_check

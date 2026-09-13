@@ -26,6 +26,7 @@ env:
   RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP || 'rg-githubiq' }}
   ACR_NAME: ${{ vars.AZURE_ACR_NAME }}
   BACKEND_APP: ${{ vars.BACKEND_APP || 'giq-backend' }}
+  WORKER_APP: ${{ vars.WORKER_APP || 'giq-worker' }}
   FRONTEND_APP: ${{ vars.FRONTEND_APP || 'giq-frontend' }}
 
 jobs:
@@ -58,6 +59,11 @@ jobs:
       - name: Update backend container app
         run: |
           az containerapp update -n "$BACKEND_APP" -g "$RESOURCE_GROUP" \
+            --image "$ACR_SERVER/githubiq-backend:${{ github.sha }}"
+
+      - name: Update worker container app
+        run: |
+          az containerapp update -n "$WORKER_APP" -g "$RESOURCE_GROUP" \
             --image "$ACR_SERVER/githubiq-backend:${{ github.sha }}"
 
       - name: Update frontend container app

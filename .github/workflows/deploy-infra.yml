@@ -61,6 +61,8 @@ jobs:
           fi
           echo "TFSTATE_SA=$SA" >> "$GITHUB_ENV"
           az group create -n "$TFSTATE_RG" -l "$LOCATION" -o none
+          # App resource group (Terraform consumes it as a data source).
+          az group create -n "$RESOURCE_GROUP" -l "$LOCATION" -o none
           az storage account create -n "$SA" -g "$TFSTATE_RG" -l "$LOCATION" \
             --sku Standard_LRS --allow-blob-public-access false -o none
           KEY="$(az storage account keys list -n "$SA" -g "$TFSTATE_RG" --query '[0].value' -o tsv)"

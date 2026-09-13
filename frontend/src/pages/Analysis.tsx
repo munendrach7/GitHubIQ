@@ -45,9 +45,9 @@ export default function Analysis() {
       }
     };
     poll();
-    // Poll every 4s — the pipeline is long-running, so a slower cadence keeps
+    // Poll every 5s — the pipeline is long-running, so a slower cadence keeps
     // the UI responsive without hammering the API.
-    timer.current = window.setInterval(poll, 4000);
+    timer.current = window.setInterval(poll, 5000);
     return () => window.clearInterval(timer.current);
   }, [id, nav]);
 

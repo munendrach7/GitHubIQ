@@ -5,10 +5,9 @@ import logging
 import time
 import uuid
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
-from .. import cancel as cancel_registry
-from ..agents.orchestrator import AGENT_NAMES, run_pipeline
+from ..agents.orchestrator import AGENT_NAMES
 from ..auth import get_current_user, rate_status, record_generation
 from ..github_client import GitHubClient, parse_repo_url
 from ..messaging import enqueue_analysis, servicebus_enabled
@@ -29,33 +28,9 @@ router = APIRouter(prefix="/api", tags=["analysis"])
 _TERMINAL = {AnalysisStatus.done, AnalysisStatus.error, AnalysisStatus.cancelled}
 
 
-def _run_analysis(analysis_id: str, req: AnalyzeRequest) -> None:
-    """In-process execution path (used when Service Bus is not configured)."""
-    store = get_store()
-    result = store.get(analysis_id)
-    if result is None:
-        return
-    cancel_event = cancel_registry.register(analysis_id)
-    try:
-        owner, repo = parse_repo_url(req.repo_url)
-        with GitHubClient() as gh:
-            ctx = gh.fetch_context(owner, repo, req.scope_path)
-    except Exception as exc:  # noqa: BLE001
-        logger.exception("Failed to fetch repo")
-        result.status = AnalysisStatus.error
-        result.error = f"Could not read repository: {exc}"
-        store.upsert(result)
-        return
-    try:
-        run_pipeline(result, ctx, store, cancel_event=cancel_event)
-    finally:
-        cancel_registry.clear(analysis_id)
-
-
 @router.post("/analyze", response_model=AnalysisResult, response_model_by_alias=True)
 def analyze(
     req: AnalyzeRequest,
-    background: BackgroundTasks,
     user: User = Depends(get_current_user),
 ) -> AnalysisResult:
     store = get_store()
@@ -69,6 +44,14 @@ def analyze(
                 f"{status.seconds_left // 60} min."
             ),
             headers={"Retry-After": str(status.seconds_left)},
+        )
+
+    # Service Bus is the ONLY processing path. If the queue is unreachable we fail
+    # fast rather than silently running the job any other way.
+    if not servicebus_enabled():
+        raise HTTPException(
+            status_code=503,
+            detail="Analysis backend is not configured (job queue unavailable).",
         )
 
     analysis_id = uuid.uuid4().hex[:12]
@@ -86,12 +69,17 @@ def analyze(
     # Record the generation up-front so concurrent requests can't bypass the limit.
     record_generation(store, user)
 
-    # Prefer async dispatch to a worker via Service Bus; fall back to running the
-    # job in-process so local dev / demos work without any broker configured.
-    if servicebus_enabled() and enqueue_analysis(analysis_id):
-        logger.info("Analysis %s dispatched to worker queue", analysis_id)
-    else:
-        background.add_task(_run_analysis, analysis_id, req)
+    # Dispatch to a worker via Service Bus. The worker runs the pipeline and writes
+    # all progress/results to Cosmos DB, which this API reads back for status.
+    if not enqueue_analysis(analysis_id):
+        result.status = AnalysisStatus.error
+        result.error = "Could not queue the analysis job. Please try again."
+        store.upsert(result)
+        raise HTTPException(
+            status_code=503,
+            detail="Analysis queue is unavailable. Please try again shortly.",
+        )
+    logger.info("Analysis %s queued to Service Bus for a worker", analysis_id)
     return result
 
 
@@ -109,15 +97,16 @@ def cancel_analysis(
     if result.status in _TERMINAL:
         return result  # already finished; nothing to cancel
 
-    # Persist the flag (a worker in another process polls it) AND signal any
-    # in-process run so it aborts promptly.
+    # Record a cancel intent in a SEPARATE record the worker polls, so the
+    # worker's own progress writes can never overwrite it. A running job's
+    # pipeline observes the intent within ~1s and transitions to 'cancelled'.
+    store.request_cancel(analysis_id)
     result.cancel_requested = True
     if result.status == AnalysisStatus.queued:
         # Not started yet — mark it cancelled right away for snappy feedback.
         result.status = AnalysisStatus.cancelled
         result.error = "Cancelled by user."
     store.upsert(result)
-    cancel_registry.request_cancel(analysis_id)
     return result
 
 

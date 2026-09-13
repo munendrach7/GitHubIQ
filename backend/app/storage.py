@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 import threading
+import time
 from typing import Optional
 
 from .config import get_settings
@@ -35,11 +36,24 @@ class Store:
     def list_all_analyses(self) -> list[AnalysisResult]:  # pragma: no cover
         raise NotImplementedError
 
+    # --- Cancellation intents (separate from the analysis doc so a worker's
+    # progress writes can never clobber a user's cancel request) ---
+    def request_cancel(self, analysis_id: str) -> None:  # pragma: no cover
+        raise NotImplementedError
+
+    def is_cancel_requested(self, analysis_id: str) -> bool:  # pragma: no cover
+        raise NotImplementedError
+
+    def cleanup(self, older_than_ts: float) -> int:  # pragma: no cover
+        """Delete terminal analyses and cancel intents created before ``older_than_ts``."""
+        raise NotImplementedError
+
 
 class MemoryStore(Store):
     def __init__(self) -> None:
         self._data: dict[str, dict] = {}
         self._users: dict[str, dict] = {}
+        self._cancels: dict[str, float] = {}
         self._lock = threading.Lock()
 
     def upsert(self, result: AnalysisResult) -> None:
@@ -71,6 +85,30 @@ class MemoryStore(Store):
             docs = list(self._data.values())
         results = [AnalysisResult.model_validate(d) for d in docs]
         return sorted(results, key=lambda r: r.created_at, reverse=True)
+
+    def request_cancel(self, analysis_id: str) -> None:
+        with self._lock:
+            self._cancels[analysis_id] = time.time()
+
+    def is_cancel_requested(self, analysis_id: str) -> bool:
+        with self._lock:
+            return analysis_id in self._cancels
+
+    def cleanup(self, older_than_ts: float) -> int:
+        removed = 0
+        with self._lock:
+            for aid, doc in list(self._data.items()):
+                if doc.get("status") in ("done", "error", "cancelled") and (
+                    doc.get("created_at") or 0
+                ) < older_than_ts:
+                    del self._data[aid]
+                    self._cancels.pop(aid, None)
+                    removed += 1
+            for aid, ts in list(self._cancels.items()):
+                if ts < older_than_ts:
+                    del self._cancels[aid]
+                    removed += 1
+        return removed
 
 
 class CosmosStore(Store):
@@ -138,11 +176,59 @@ class CosmosStore(Store):
         return [AnalysisResult.model_validate(d) for d in items]
 
     def list_all_analyses(self) -> list[AnalysisResult]:
-        query = "SELECT * FROM c ORDER BY c.created_at DESC"
+        # Exclude cancel-intent docs; tolerate any malformed doc rather than 500.
+        query = "SELECT * FROM c WHERE NOT STARTSWITH(c.id, 'cancel:')"
         items = self._container.query_items(
             query=query, enable_cross_partition_query=True
         )
-        return [AnalysisResult.model_validate(d) for d in items]
+        results: list[AnalysisResult] = []
+        for d in items:
+            try:
+                results.append(AnalysisResult.model_validate(d))
+            except Exception:  # noqa: BLE001
+                continue
+        return sorted(results, key=lambda r: r.created_at, reverse=True)
+
+    def request_cancel(self, analysis_id: str) -> None:
+        self._container.upsert_item(
+            {
+                "id": f"cancel:{analysis_id}",
+                "kind": "cancel",
+                "analysis_id": analysis_id,
+                "created_at": time.time(),
+            }
+        )
+
+    def is_cancel_requested(self, analysis_id: str) -> bool:
+        from azure.cosmos import exceptions
+
+        cid = f"cancel:{analysis_id}"
+        try:
+            self._container.read_item(cid, partition_key=cid)
+            return True
+        except exceptions.CosmosHttpResponseError:
+            return False
+
+    def cleanup(self, older_than_ts: float) -> int:
+        query = (
+            "SELECT c.id FROM c WHERE c.created_at < @cutoff AND "
+            "(STARTSWITH(c.id, 'cancel:') OR c.status IN ('done', 'error', 'cancelled'))"
+        )
+        items = list(
+            self._container.query_items(
+                query=query,
+                parameters=[{"name": "@cutoff", "value": older_than_ts}],
+                enable_cross_partition_query=True,
+            )
+        )
+        removed = 0
+        for it in items:
+            try:
+                self._container.delete_item(it["id"], partition_key=it["id"])
+                removed += 1
+            except Exception:  # noqa: BLE001
+                continue
+        return removed
 
 
 _store: Optional[Store] = None
