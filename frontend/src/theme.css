@@ -23,6 +23,8 @@
   --glow-3: rgba(63, 185, 80, 0.1);
   --code-bg: #010409;
   --radius: 16px;
+  /* Microsoft brand code font */
+  --mono: "Cascadia Code", "Cascadia Mono", "Consolas", "SF Mono", ui-monospace, monospace;
 }
 
 [data-theme="light"] {

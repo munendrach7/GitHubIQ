@@ -16,6 +16,7 @@ import re
 
 from ..llm import invoke_json
 from ..models import Component, ResearchBrief
+from ..prompts import render
 from .state import GraphState
 
 SYSTEM = (
@@ -86,43 +87,20 @@ def _heuristic(ctx) -> ResearchBrief:
 def run(state: GraphState) -> dict:
     ctx = state["ctx"]
     reporter = state["reporter"]
-    reporter.update("Researcher", "running", "Crawling repo structure & entry points")
+    reporter.update("Researcher", "running", "Crawling repo from entry points & delegating files")
 
     fallback = _heuristic(ctx)
-    prompt = (
-        f"Repository: {ctx.meta.owner}/{ctx.meta.name}\n"
-        f"Description: {ctx.meta.description}\n"
-        f"Languages: {', '.join(ctx.meta.languages) or 'unknown'}\n"
-        f"Total files: {ctx.meta.file_count}\n\n"
-        f"FULL FILE TREE:\n{ctx.file_listing(500)}\n\n"
-        f"ANCHOR FILE CONTENTS (README, manifests, entry points):\n"
-        f"{ctx.anchor_sources()}\n\n"
-        "Analyse like an engineer. Return JSON with this exact shape:\n"
-        "{\n"
-        '  "what": "one plain sentence: what this project IS",\n'
-        '  "does": "what it does for its users (2-3 sentences)",\n'
-        '  "how": "how it works at a high level (3-4 sentences)",\n'
-        '  "entry_points": ["real/path/to/entry", ...],\n'
-        '  "modules": ["top-level dirs that matter"],\n'
-        '  "languages": ["..."],\n'
-        '  "has_database": true|false,\n'
-        '  "components": [{"id": "slug", "name": "Human Name", '
-        '"kind": "frontend|backend service|worker|library|cli|infra|database", '
-        '"path": "root/path", "tech": ["..."], "responsibility": "what it owns", '
-        '"key_files": ["real/paths", ...]}],\n'
-        '  "file_assignments": {\n'
-        '     "architect": ["files that reveal services & how they connect"],\n'
-        '     "schema": ["migration/model/schema files — [] if no database"],\n'
-        '     "dataflow": ["files that implement the main request/operation path"],\n'
-        '     "tutor": ["files showing the key language/framework idioms"],\n'
-        '     "walkthrough": ["UI/route/entry files that reveal what the app looks like"]\n'
-        "  }\n"
-        "}\n"
-        "Rules: use ONLY real paths from the tree. Pick 4-10 files per assignment. "
-        "If there is genuinely no database, set has_database=false and schema=[]. "
-        "Identify EVERY significant component — do not merge distinct services."
+    prompt = render(
+        "researcher_user",
+        owner=ctx.meta.owner,
+        repo=ctx.meta.name,
+        description=ctx.meta.description or "(none)",
+        languages=", ".join(ctx.meta.languages) or "unknown",
+        filecount=ctx.meta.file_count,
+        tree=ctx.file_listing(900),
+        anchors=ctx.anchor_sources(total_budget=150_000),
     )
-    data = invoke_json(SYSTEM, prompt, default=None)
+    data = invoke_json(render("researcher_system"), prompt, default=None)
 
     if isinstance(data, dict) and data.get("components"):
         try:

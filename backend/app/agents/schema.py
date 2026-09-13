@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from ..llm import invoke_json
 from ..models import Schema
+from ..prompts import render
 from .state import GraphState
 
 SYSTEM = (
@@ -35,22 +36,15 @@ def run(state: GraphState) -> dict:
         reporter.update("Schema", "done", "no database")
         return {"schema": _empty("No database in this repository.")}
 
-    sources = ctx.read_files(assigned, total_budget=70_000) or ctx.sampled_sources(8)
-    prompt = (
-        f"Repository: {ctx.meta.owner}/{ctx.meta.name}\n"
-        f"What it is: {brief.what}\n\n"
-        f"SCHEMA / MODEL / MIGRATION FILES:\n{sources}\n\n"
-        "Return JSON: {\"summary\": str, "
-        "\"tables\": [{\"name\": str, \"columns\": [{\"name\": str, \"type\": str, "
-        "\"key\": \"pk\"|\"fk\"|\"\", \"ref\": \"table.column\"}]}], "
-        "\"relationships\": [{\"source\": table, \"target\": table, "
-        "\"cardinality\": \"1:N\"|\"N:1\"|\"1:1\"|\"N:N\"}], "
-        "\"plain_english\": str}. "
-        "Include EVERY table you find with all columns and correct key markers. "
-        "If there is genuinely no database, return {\"tables\": [], "
-        "\"relationships\": [], \"summary\": \"No database\"}."
+    sources = ctx.read_files(assigned, total_budget=90_000) or ctx.sampled_sources(8)
+    prompt = render(
+        "schema_user",
+        owner=ctx.meta.owner,
+        repo=ctx.meta.name,
+        what=brief.what,
+        sources=sources,
     )
-    data = invoke_json(SYSTEM, prompt, default=None)
+    data = invoke_json(render("schema_system"), prompt, default=None)
 
     schema = _empty("No relational schema detected.")
     if isinstance(data, dict) and data.get("tables") is not None:

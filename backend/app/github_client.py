@@ -77,10 +77,10 @@ class RepoContext:
         paths = [p for p in self.contents if ANCHOR_PATTERNS.search(p.lower())]
         # readmes and manifests first, then shallow files
         paths.sort(key=lambda p: (p.count("/"), 0 if "readme" in p.lower() else 1))
-        return self.read_files(paths, total_budget=total_budget, per_file=12_000)
+        return self.read_files(paths, total_budget=total_budget, per_file=16_000)
 
     def read_files(
-        self, paths: list[str], *, total_budget: int = 60_000, per_file: int = 12_000
+        self, paths: list[str], *, total_budget: int = 60_000, per_file: int = 14_000
     ) -> str:
         """Return concatenated contents for the given paths, within a token budget."""
         chunks: list[str] = []
@@ -209,7 +209,7 @@ class GitHubClient:
         selected: list[tuple[int, tarfile.TarInfo, str]] = []
         files: list[RepoFile] = []
         contents: dict[str, str] = {}
-        total_budget = 3_000_000  # ~3MB of source kept in memory
+        total_budget = 5_000_000  # ~5MB of source kept in memory
         used = 0
 
         with tarfile.open(fileobj=io.BytesIO(resp.content), mode="r:gz") as tar:
@@ -229,7 +229,7 @@ class GitHubClient:
                     continue
                 selected.append((score, member, rel))
                 # Populate the full content map within budget.
-                if used < total_budget and len(contents) < 400:
+                if used < total_budget and len(contents) < 600:
                     extracted = tar.extractfile(member)
                     if extracted is not None:
                         raw = extracted.read(self.max_bytes)

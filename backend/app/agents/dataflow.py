@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from ..llm import invoke_json
 from ..models import DataFlow, FlowStep
+from ..prompts import render
 from .state import GraphState
 
 SYSTEM = (
@@ -35,32 +36,27 @@ def run(state: GraphState) -> dict:
     reporter = state["reporter"]
     arch = state["architecture"]
     brief = state["research"]
+    schema = state.get("schema")
     reporter.update("Data-Flow", "running", "Tracing the main operation end to end")
 
     fallback = _heuristic(ctx, arch)
     node_summary = "\n".join(
         f"- {n.id}: {n.label} ({n.role}, layer={n.layer})" for n in arch.nodes
     )
+    tables = ", ".join(t.name for t in schema.tables) if schema and schema.tables else "(none)"
     sources = ctx.read_files(
-        brief.file_assignments.get("dataflow", []), total_budget=75_000
+        brief.file_assignments.get("dataflow", []), total_budget=110_000
     ) or ctx.sampled_sources(12)
-    prompt = (
-        f"Repository: {ctx.meta.owner}/{ctx.meta.name}\n"
-        f"What it is: {brief.what}\n\n"
-        f"COMPONENTS:\n{node_summary}\n\n"
-        f"ASSIGNED SOURCE FILES (the real implementation of the flow):\n{sources}\n\n"
-        "Pick the single most illustrative operation (e.g. create/fetch a core "
-        "resource, or the main CLI/library call). Return JSON: "
-        "{\"title\": str, \"trigger\": str, \"summary\": str, "
-        "\"steps\": [{\"index\": int, \"actor\": str, \"label\": str, "
-        "\"kind\": \"sync\"|\"async\", \"files\": [\"real/path\"], "
-        "\"data_in\": \"payload/state entering\", \"data_out\": \"payload/state leaving\", "
-        "\"code\": \"short real snippet with example values\", "
-        "\"detail\": \"2-4 sentence deeper explanation of what happens here\"}], "
-        "\"rationale\": str, \"alternatives\": [\"other notable flows\"]}. "
-        "Use 5-8 steps grounded in the actual files. 'files' must be real paths."
+    prompt = render(
+        "dataflow_user",
+        owner=ctx.meta.owner,
+        repo=ctx.meta.name,
+        what=brief.what,
+        nodes=node_summary,
+        tables=tables,
+        sources=sources,
     )
-    data = invoke_json(SYSTEM, prompt, default=None)
+    data = invoke_json(render("dataflow_system"), prompt, default=None)
 
     flow = fallback
     if isinstance(data, dict) and data.get("steps"):

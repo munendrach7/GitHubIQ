@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from ..llm import invoke_json
 from ..models import Lesson, Preferences
+from ..prompts import render
 from .state import GraphState
 
 SYSTEM = (
@@ -12,20 +13,27 @@ SYSTEM = (
 )
 
 
-def _heuristic(ctx, prefs: Preferences) -> list[Lesson]:
+def _heuristic(ctx, prefs: Preferences, brief=None) -> list[Lesson]:
     langs = ctx.meta.languages or [ctx.meta.primary_language or "the stack"]
+    entries = ", ".join((brief.entry_points if brief else [])[:4]) or "the entry points"
+    mods = ", ".join((brief.modules if brief else [])[:6])
     lessons = []
     for i, lang in enumerate(langs[:3]):
+        body = (
+            f"**{ctx.meta.name}** is written in **{lang}**. Start from "
+            f"`{entries}` and read into the core modules"
+            + (f" (`{mods}`)" if mods else "")
+            + f". Watch for the {lang} idioms this project leans on — its module "
+            "structure, key classes/functions, decorators or types — and how they "
+            "wire the pieces together."
+        )
         lessons.append(
             Lesson(
                 id=f"lang-{i}",
-                title=f"{lang} fundamentals for this repo",
+                title=f"{lang} in {ctx.meta.name}",
                 section="Go hands-on",
                 summary=f"Key {lang} idioms you'll meet in {ctx.meta.name}.",
-                body=(
-                    f"{ctx.meta.name} uses {lang}. Focus on the patterns that appear "
-                    f"in the entry points and core modules as you read the code."
-                ),
+                body=body,
                 tags=[lang, "language"],
             )
         )
@@ -39,37 +47,37 @@ def run(state: GraphState) -> dict:
     brief = state["research"]
     reporter.update("Tutor", "running", "Explaining language idioms & patterns")
 
-    fallback = _heuristic(ctx, prefs)
+    fallback = _heuristic(ctx, prefs, brief)
     sources = ctx.read_files(
-        brief.file_assignments.get("tutor", []), total_budget=55_000
+        brief.file_assignments.get("tutor", []), total_budget=80_000
     ) or ctx.sampled_sources(8)
-    prompt = (
-        f"Repository: {ctx.meta.owner}/{ctx.meta.name}\n"
-        f"What it is: {brief.what}\n"
-        f"Languages: {', '.join(ctx.meta.languages)}\n"
-        f"Learner role: {prefs.role.value}; familiarity: {prefs.familiarity.value}; "
-        f"depth: {prefs.depth.value}; goals: {', '.join(prefs.goals) or 'general'}\n\n"
-        f"ASSIGNED SOURCE (idioms to explain):\n{sources}\n\n"
-        "Return JSON: {\"lessons\": [{\"id\": str, \"title\": str, "
-        "\"summary\": str, \"body\": str, \"tags\": [str]}]}. "
-        "Produce 3-5 concise, concrete lessons on the specific language/framework "
-        "idioms and patterns used in THIS repo (reference real constructs you see), "
-        "matched to the learner's experience level. Prefer showing over telling. "
-        "Format each 'body' in GitHub-flavoured MARKDOWN: use short paragraphs, "
-        "**bold** for key terms, bullet lists with '-', and fenced ```code``` "
-        "blocks or `inline code` for real snippets and identifiers."
+    prompt = render(
+        "tutor_user",
+        owner=ctx.meta.owner,
+        repo=ctx.meta.name,
+        what=brief.what,
+        languages=", ".join(ctx.meta.languages),
+        role=prefs.role.value,
+        familiarity=prefs.familiarity.value,
+        depth=prefs.depth.value,
+        goals=", ".join(prefs.goals) or "general",
+        sources=sources,
     )
-    data = invoke_json(SYSTEM, prompt, default=None)
+    data = invoke_json(render("tutor_system"), prompt, default=None)
 
-    lessons = fallback
+    lessons: list[Lesson] = []
     if isinstance(data, dict) and data.get("lessons"):
-        try:
-            lessons = [
-                Lesson.model_validate({**l, "section": "Go hands-on"})
-                for l in data["lessons"]
-            ]
-        except Exception:  # noqa: BLE001
-            lessons = fallback
+        for i, l in enumerate(data["lessons"]):
+            try:
+                l = {**l, "section": "Go hands-on"}
+                l.setdefault("id", f"tutor-{i}")
+                if isinstance(l.get("tags"), str):
+                    l["tags"] = [l["tags"]]
+                lessons.append(Lesson.model_validate(l))
+            except Exception:  # noqa: BLE001 - skip a malformed lesson, keep the rest
+                continue
+    if not lessons:
+        lessons = fallback
 
     reporter.update("Tutor", "done", f"{len(lessons)} language lessons")
     return {"tutor_lessons": lessons}

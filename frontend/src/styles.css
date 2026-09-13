@@ -17,8 +17,8 @@ body {
     radial-gradient(900px 600px at 50% 120%, var(--glow-3), transparent 60%),
     var(--bg);
   color: var(--text);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans",
-    Helvetica, Arial, sans-serif;
+  font-family: "Segoe UI Variable Text", "Segoe UI Variable", "Segoe UI",
+    system-ui, -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   transition: background 0.3s ease, color 0.3s ease;
 }
@@ -50,7 +50,7 @@ a {
 }
 
 .mono {
-  font-family: "SF Mono", "JetBrains Mono", "Consolas", monospace;
+  font-family: var(--mono);
 }
 .muted {
   color: var(--muted);
@@ -261,7 +261,7 @@ a {
   outline: none;
   color: var(--text);
   font-size: 15px;
-  font-family: "SF Mono", "Consolas", monospace;
+  font-family: var(--mono);
 }
 .hero-cards { display: grid; gap: 14px; }
 .hero-card {
@@ -321,8 +321,10 @@ a {
   display: inline-flex; align-items: center; gap: 6px;
   padding: 9px 15px; border-radius: 999px; font-size: 13.5px; font-weight: 600;
   border: 1px solid var(--border); background: var(--panel-solid);
+  color: color-mix(in srgb, var(--text) 85%, transparent);
   cursor: pointer; transition: all 0.15s;
 }
+.chip:hover { color: var(--text); border-color: var(--muted); }
 .chip.on { border-color: var(--purple); background: color-mix(in srgb, var(--purple) 16%, transparent); color: var(--purple); }
 .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
 .seg button { padding: 9px 16px; background: var(--panel-solid); border: none; color: var(--muted); cursor: pointer; font-size: 13.5px; font-weight: 600; }
@@ -437,7 +439,7 @@ a {
 .schema-grid { display: grid; grid-template-columns: 1fr 300px; gap: 16px; }
 .table-card { padding: 0; overflow: hidden; }
 .table-card .th { padding: 10px 14px; font-weight: 700; font-size: 13.5px; background: color-mix(in srgb, var(--purple) 12%, transparent); }
-.table-card .col { display: flex; justify-content: space-between; gap: 10px; padding: 8px 14px; font-size: 12.5px; border-top: 1px solid var(--border-soft); font-family: monospace; }
+.table-card .col { display: flex; justify-content: space-between; gap: 10px; padding: 8px 14px; font-size: 12.5px; border-top: 1px solid var(--border-soft); font-family: var(--mono); }
 .table-card .col .k { color: var(--muted); text-align: right; }
 .key-pk { color: var(--yellow); }
 .key-fk { color: var(--blue); }
@@ -576,7 +578,7 @@ a {
 .md li { margin: 5px 0; }
 .md strong { color: var(--text); font-weight: 700; }
 .md a { color: var(--blue); text-decoration: underline; }
-.md code { font-family: "SF Mono","Consolas",monospace; font-size: 0.88em; background: var(--code-bg); border: 1px solid var(--border-soft); border-radius: 6px; padding: 1px 6px; }
+.md code { font-family: var(--mono); font-size: 0.88em; background: var(--code-bg); border: 1px solid var(--border-soft); border-radius: 6px; padding: 1px 6px; }
 .md pre { background: var(--code-bg); border: 1px solid var(--border-soft); border-radius: 10px; padding: 14px; overflow-x: auto; margin: 0 0 12px; }
 .md pre code { border: none; background: none; padding: 0; font-size: 12.5px; line-height: 1.55; }
 .md blockquote { border-left: 3px solid var(--border); margin: 0 0 12px; padding: 2px 0 2px 14px; color: var(--muted); }
@@ -623,7 +625,7 @@ a {
 .v-tables { display: flex; flex-wrap: wrap; gap: 14px; max-width: 80%; }
 .v-table { border-radius: 10px; overflow: hidden; border: 1px solid var(--border); background: var(--panel-solid); min-width: 150px; }
 .v-table-h { padding: 8px 12px; font-weight: 700; font-size: 13px; }
-.v-table-c { padding: 5px 12px; font-size: 12px; font-family: monospace; color: var(--muted); border-top: 1px solid var(--border-soft); }
+.v-table-c { padding: 5px 12px; font-size: 12px; font-family: var(--mono); color: var(--muted); border-top: 1px solid var(--border-soft); }
 .video-bullets { position: absolute; right: 34px; top: 30px; display: flex; flex-direction: column; gap: 10px; max-width: 40%; align-items: flex-end; }
 .video-bullet { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px; background: color-mix(in srgb, var(--text) 6%, transparent); border: 1px solid var(--border-soft); font-size: 13px; }
 .vb-dot { width: 8px; height: 8px; border-radius: 50%; }

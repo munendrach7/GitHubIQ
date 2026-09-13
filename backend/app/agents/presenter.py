@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from ..llm import invoke_json
 from ..models import VideoExplainer, VideoScene
+from ..prompts import render
 from .state import GraphState
 
 PERSONA = "Alex"
@@ -82,27 +83,22 @@ def run(state: GraphState) -> dict:
     comp = "; ".join(f"{c.name} ({c.kind})" for c in brief.components)
     flow_desc = " -> ".join(f"{s.actor}: {s.label}" for s in flow.steps[:6])
     has_schema = bool(schema.tables)
-    prompt = (
-        f"Project: {ctx.meta.owner}/{ctx.meta.name}\n"
-        f"What it is: {brief.what}\nWhat it does: {brief.does}\nHow it works: {brief.how}\n"
-        f"Components: {comp}\n"
-        f"Architecture: {arch.summary}\n"
-        f"Main flow ({flow.title}): {flow_desc}\n"
-        f"Has database: {has_schema}"
-        + (f"; tables: {', '.join(t.name for t in schema.tables)}" if has_schema else "")
-        + "\n\n"
-        "Write Alex's video script. Return JSON: "
-        "{\"title\": str, \"tagline\": str, \"scenes\": [{\"id\": str, "
-        "\"title\": str, \"narration\": str, \"bullets\": [str], "
-        "\"visual\": \"intro\"|\"components\"|\"architecture\"|\"dataflow\"|\"schema\"|\"outro\", "
-        "\"accent\": \"blue\"|\"purple\"|\"green\"|\"orange\"|\"pink\"}]}. "
-        "Use these scenes in order: intro, components, architecture, dataflow"
-        + (", schema" if has_schema else "")
-        + ", outro. Narration is what Alex SAYS (plain, spoken, 2-4 sentences, first "
-        "person). bullets are 2-4 short on-screen phrases. Keep the whole script "
-        "concise for a ~75 second video."
+    prompt = render(
+        "presenter_user",
+        owner=ctx.meta.owner,
+        repo=ctx.meta.name,
+        what=brief.what,
+        does=brief.does,
+        how=brief.how,
+        components=comp,
+        architecture=arch.summary,
+        flow_title=flow.title,
+        flow_desc=flow_desc,
+        has_database=has_schema,
+        schema_tables=(f"; tables: {', '.join(t.name for t in schema.tables)}" if has_schema else ""),
+        schema_scene=(", schema" if has_schema else ""),
     )
-    data = invoke_json(SYSTEM, prompt, default=None)
+    data = invoke_json(render("presenter_system"), prompt, default=None)
 
     video = fallback
     if isinstance(data, dict) and data.get("scenes"):

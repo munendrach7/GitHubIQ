@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from ..llm import invoke_json
 from ..models import Architecture, ServiceEdge, ServiceNode
+from ..prompts import render
 from .state import GraphState
 
 SYSTEM = (
@@ -54,27 +55,19 @@ def run(state: GraphState) -> dict:
         for c in brief.components
     )
     sources = ctx.read_files(
-        brief.file_assignments.get("architect", []), total_budget=70_000
+        brief.file_assignments.get("architect", []), total_budget=110_000
     )
-    prompt = (
-        f"Repository: {ctx.meta.owner}/{ctx.meta.name}\n"
-        f"What it is: {brief.what}\nHow it works: {brief.how}\n\n"
-        f"COMPONENTS (from researcher):\n{comp_desc}\n\n"
-        f"ASSIGNED SOURCE FILES:\n{sources}\n\n"
-        "Return JSON: {\"summary\": str, "
-        "\"layers\": [\"entry\", \"service\", \"data\", \"external\"], "
-        "\"nodes\": [{\"id\": slug, \"label\": str, \"path\": str, \"language\": str, "
-        "\"role\": str, \"component\": str, \"tech\": [str], \"layer\": "
-        "\"entry\"|\"service\"|\"data\"|\"external\"|\"ui\", \"summary\": str, "
-        "\"inbound\": [node_id], \"outbound\": [node_id]}], "
-        "\"edges\": [{\"source\": id, \"target\": id, \"label\": str, "
-        "\"kind\": \"request\"|\"event\"|\"support\"|\"data\", "
-        "\"protocol\": \"http\"|\"queue\"|\"sql\"|\"fs\"|\"internal\"}]}. "
-        "Produce 5-10 nodes covering the whole system (include databases, queues, "
-        "external services). inbound/outbound must reference node ids and be "
-        "consistent with edges. Assign every node to a layer."
+    prompt = render(
+        "architect_user",
+        owner=ctx.meta.owner,
+        repo=ctx.meta.name,
+        what=brief.what,
+        how=brief.how,
+        notes=brief.notes or "(none)",
+        components=comp_desc,
+        sources=sources,
     )
-    data = invoke_json(SYSTEM, prompt, default=None)
+    data = invoke_json(render("architect_system"), prompt, default=None)
 
     arch = fallback
     if isinstance(data, dict) and data.get("nodes"):
