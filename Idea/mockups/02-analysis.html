@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="style.css">
+<style>
+  .wrap { padding:34px 46px; }
+  .head { display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:26px; }
+  .head h1 { font-size:32px; letter-spacing:-0.8px; }
+  .head p { color:var(--muted); margin-top:8px; font-size:15px; }
+  .repo-chip { display:inline-flex; gap:10px; align-items:center; padding:8px 15px; border-radius:10px;
+    background:rgba(240,246,252,0.03); border:1px solid var(--border-soft); font-size:14px; }
+  .layout { display:grid; grid-template-columns: 1.35fr 1fr; gap:22px; }
+  .agents { padding:24px; }
+  .agents h3 { font-size:15px; text-transform:uppercase; letter-spacing:1px; color:var(--muted); margin-bottom:18px; }
+  .agent { display:flex; align-items:center; gap:16px; padding:15px 16px; border-radius:13px;
+    border:1px solid var(--border-soft); margin-bottom:13px; background:rgba(240,246,252,0.02); }
+  .agent . av { width:44px;height:44px;border-radius:11px;display:grid;place-items:center;font-size:21px; }
+  .agent .meta { flex:1; }
+  .agent .meta .n { font-weight:700; font-size:15.5px; }
+  .agent .meta .t { color:var(--muted); font-size:13px; margin-top:3px; }
+  .agent .side { width:180px; }
+  .agent .side .row { display:flex; justify-content:space-between; font-size:12px; margin-bottom:6px; }
+  .state { font-size:12px; font-weight:700; padding:3px 9px; border-radius:7px; }
+  .state.done{ background:rgba(63,185,80,0.15); color:var(--green) }
+  .state.run{ background:rgba(88,166,255,0.15); color:var(--blue) }
+  .state.wait{ background:rgba(139,148,158,0.15); color:var(--muted) }
+  .right { display:flex; flex-direction:column; gap:22px; }
+  .card { padding:22px; }
+  .card h3 { font-size:15px; text-transform:uppercase; letter-spacing:1px; color:var(--muted); margin-bottom:16px; }
+  .bigprog { text-align:center; }
+  .ring { width:150px; height:150px; margin:6px auto 14px; border-radius:50%;
+    background: conic-gradient(var(--blue) 0 68%, rgba(240,246,252,0.08) 68% 100%);
+    display:grid; place-items:center; position:relative; }
+  .ring::after { content:""; position:absolute; inset:12px; border-radius:50%; background:#0d1117; }
+  .ring .v { position:relative; z-index:1; font-size:36px; font-weight:800; }
+  .feed .li { display:flex; gap:11px; font-size:13.5px; padding:8px 0; border-bottom:1px solid var(--border-soft); color:var(--muted); }
+  .feed .li b { color:var(--text); font-weight:600; }
+  .feed .li .tm { margin-left:auto; font-size:11.5px; color:var(--dim); }
+  .metrics { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+  .metric { text-align:center; padding:14px 8px; border-radius:11px; background:rgba(240,246,252,0.02); border:1px solid var(--border-soft); }
+  .metric .n { font-size:23px; font-weight:800; } .metric .l { font-size:11.5px; color:var(--muted); margin-top:3px; }
+</style>
+</head>
+<body>
+<div class="grid-overlay"></div>
+<div class="app">
+  <div class="topbar">
+    <div class="brand"><div class="logo">🩻</div>
+      <div><div class="name">GitHub<b>XRay</b></div><div class="sub">your Project Tutor</div></div></div>
+    <div class="repo-chip mono">📦 your-org/sample-app <span class="tag blue">main</span> <span class="muted">· 1,284 files · TypeScript · Go · Postgres</span></div>
+    <div class="top-actions"><span class="pill"><span class="dot b"></span> Analyzing…</span><div class="avatar">MC</div></div>
+  </div>
+
+  <div class="wrap">
+    <div class="head">
+      <div>
+        <h1>🔬 X-Raying the repository</h1>
+        <p>Six specialist agents work asynchronously to understand your codebase and draft your guide.</p>
+      </div>
+      <div class="repo-chip"><span class="dot g"></span> Secure workspace · no code leaves your environment</div>
+    </div>
+
+    <div class="layout">
+      <div class="agents glass">
+        <h3>Multi-agent crew</h3>
+
+        <div class="agent">
+          <div class="av" style="background:rgba(88,166,255,0.12)">🧭</div>
+          <div class="meta"><div class="n">Explorer Agent</div><div class="t">Maps repo tree, entry points &amp; module boundaries</div></div>
+          <div class="side"><div class="row"><span class="muted">1,284 / 1,284 files</span><span class="state done">Done</span></div><div class="bar"><i style="width:100%"></i></div></div>
+        </div>
+
+        <div class="agent">
+          <div class="av" style="background:rgba(188,140,255,0.12)">🏛️</div>
+          <div class="meta"><div class="n">Architect Agent</div><div class="t">Detects services, layers &amp; interaction edges</div></div>
+          <div class="side"><div class="row"><span class="muted">Building graph…</span><span class="state run">Running</span></div><div class="bar"><i style="width:82%"></i></div></div>
+        </div>
+
+        <div class="agent">
+          <div class="av" style="background:rgba(63,185,80,0.12)">🗄️</div>
+          <div class="meta"><div class="n">Schema Agent</div><div class="t">Reverse-engineers DB models &amp; relations</div></div>
+          <div class="side"><div class="row"><span class="muted">14 / 17 tables</span><span class="state run">Running</span></div><div class="bar"><i style="width:74%"></i></div></div>
+        </div>
+
+        <div class="agent">
+          <div class="av" style="background:rgba(240,136,62,0.12)">🌊</div>
+          <div class="meta"><div class="n">Data-Flow Agent</div><div class="t">Traces requests with real example payloads</div></div>
+          <div class="side"><div class="row"><span class="muted">9 / 22 flows</span><span class="state run">Running</span></div><div class="bar"><i style="width:41%"></i></div></div>
+        </div>
+
+        <div class="agent">
+          <div class="av" style="background:rgba(247,120,186,0.12)">🎓</div>
+          <div class="meta"><div class="n">Tutor Agent</div><div class="t">Explains unfamiliar language idioms &amp; patterns</div></div>
+          <div class="side"><div class="row"><span class="muted">Queued</span><span class="state wait">Waiting</span></div><div class="bar"><i style="width:8%"></i></div></div>
+        </div>
+
+        <div class="agent">
+          <div class="av" style="background:rgba(86,212,221,0.12)">🎮</div>
+          <div class="meta"><div class="n">Sandbox Agent</div><div class="t">Assembles the playable HTML/CSS/JS playground</div></div>
+          <div class="side"><div class="row"><span class="muted">Queued</span><span class="state wait">Waiting</span></div><div class="bar"><i style="width:4%"></i></div></div>
+        </div>
+      </div>
+
+      <div class="right">
+        <div class="card glass bigprog">
+          <h3>Overall progress</h3>
+          <div class="ring"><div class="v">68<span style="font-size:18px">%</span></div></div>
+          <div class="muted" style="font-size:13px">Specialist agents running in parallel</div>
+        </div>
+
+        <div class="card glass">
+          <h3>Live activity</h3>
+          <div class="feed">
+            <div class="li">✅ <b>Explorer</b> found entry point <span class="mono">cmd/api/main.go</span></div>
+            <div class="li">🏛️ <b>Architect</b> linked <b>Gateway → Auth Service</b></div>
+            <div class="li">🗄️ <b>Schema</b> mapped <span class="mono">users ⇄ items</span> (1:N)</div>
+            <div class="li">🌊 <b>Data-Flow</b> traced <b>POST /items</b></div>
+            <div class="li">🧭 <b>Explorer</b> detected 3 background workers</div>
+          </div>
+        </div>
+
+        <div class="card glass">
+          <div class="metrics">
+            <div class="metric"><div class="n" style="color:var(--blue)">7</div><div class="l">Services</div></div>
+            <div class="metric"><div class="n" style="color:var(--green)">17</div><div class="l">DB tables</div></div>
+            <div class="metric"><div class="n" style="color:var(--purple)">22</div><div class="l">Key flows</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

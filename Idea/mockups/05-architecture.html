@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="style.css">
+<style>
+  .shell { display:grid; grid-template-columns: 1fr 330px; min-height:832px; }
+  .canvas { position:relative; padding:26px 30px; overflow:hidden; }
+  .canvas .title { display:flex; align-items:center; gap:14px; margin-bottom:6px; }
+  .canvas h1 { font-size:26px; letter-spacing:-0.6px; }
+  .canvas .cap { color:var(--muted); font-size:14px; margin-bottom:10px; }
+  .stage { position:relative; width:100%; height:700px; }
+  svg.edges { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+  .node { position:absolute; width:186px; padding:15px 16px; border-radius:14px; }
+  .node .h { display:flex; align-items:center; gap:10px; margin-bottom:7px; }
+  .node .ic { width:34px;height:34px;border-radius:9px;display:grid;place-items:center;font-size:17px; }
+  .node .n { font-weight:750; font-size:15px; }
+  .node .k { font-size:11px; color:var(--muted); }
+  .node .d { font-size:12px; color:var(--muted); line-height:1.4; }
+  .node.hot { border-color:var(--blue); box-shadow:0 0 0 1px var(--blue), 0 0 34px rgba(88,166,255,0.35); }
+  .node.async { border-color:var(--green); box-shadow:0 0 0 1px var(--green), 0 0 34px rgba(63,185,80,0.3); }
+  .flow-badge { position:absolute; padding:4px 10px; border-radius:8px; font-size:11px; font-weight:800;
+    background:#0d1117; border:1px solid var(--blue); color:var(--blue); z-index:5; }
+  .panel { border-left:1px solid var(--border-soft); background:rgba(1,4,9,0.4); padding:24px 22px; }
+  .panel h3 { font-size:13px; text-transform:uppercase; letter-spacing:1px; color:var(--muted); margin:2px 0 14px; }
+  .legend .li { display:flex; align-items:center; gap:10px; font-size:13px; margin-bottom:10px; color:var(--muted); }
+  .legend .li .sw { width:26px; height:4px; border-radius:3px; }
+  .sel-card { padding:16px; border-radius:13px; background:rgba(88,166,255,0.06); border:1px solid rgba(88,166,255,0.25); margin:18px 0; }
+  .sel-card .n { font-weight:750; font-size:16px; display:flex; align-items:center; gap:9px; }
+  .sel-card .kv { display:flex; justify-content:space-between; font-size:13px; padding:8px 0; border-bottom:1px solid var(--border-soft); }
+  .sel-card .kv span:first-child{ color:var(--muted) }
+  .replay { margin-top:14px; padding:14px; border-radius:12px; background:rgba(240,246,252,0.02); border:1px solid var(--border-soft); }
+  .replay .step { display:flex; gap:10px; font-size:12.5px; padding:6px 0; color:var(--muted); }
+  .replay .step b { color:var(--text); }
+  .replay .num { width:20px;height:20px;border-radius:50%;background:rgba(88,166,255,0.15);color:var(--blue);
+    display:grid;place-items:center;font-size:11px;font-weight:800;flex-shrink:0; }
+</style>
+</head>
+<body>
+<div class="grid-overlay"></div>
+<div class="app">
+  <div class="topbar">
+    <div class="brand"><div class="logo">🩻</div>
+      <div><div class="name">GitHub<b>XRay</b></div><div class="sub">your-org/sample-app</div></div></div>
+    <div class="nav"><span>My Guide</span><span class="active">Architecture</span><span>Data Flow</span><span>Schema</span><span>Sandbox</span></div>
+    <div class="top-actions"><span class="pill"><span class="dot b"></span> Replaying: create item</span><div class="avatar">MC</div></div>
+  </div>
+
+  <div class="shell">
+    <div class="canvas">
+      <div class="title"><span style="font-size:26px">🗺️</span><h1>Live architecture map</h1>
+        <span class="tag blue">interactive</span></div>
+      <div class="cap">Watch a real <b>POST /items</b> travel across services. Highlighted edges are the active path.</div>
+
+      <div class="stage">
+        <svg class="edges" viewBox="0 0 1050 700" preserveAspectRatio="none">
+          <defs>
+            <marker id="ah" markerWidth="9" markerHeight="9" refX="6" refY="3" orient="auto">
+              <path d="M0,0 L6,3 L0,6 Z" fill="#58a6ff"/></marker>
+            <marker id="ag" markerWidth="9" markerHeight="9" refX="6" refY="3" orient="auto">
+              <path d="M0,0 L6,3 L0,6 Z" fill="#3fb950"/></marker>
+            <marker id="ad" markerWidth="9" markerHeight="9" refX="6" refY="3" orient="auto">
+              <path d="M0,0 L6,3 L0,6 Z" fill="#6e7681"/></marker>
+          </defs>
+          <path d="M150,120 L150,300" stroke="#58a6ff" stroke-width="3" fill="none" marker-end="url(#ah)"/>
+          <path d="M250,340 L430,180" stroke="#6e7681" stroke-width="2" stroke-dasharray="5 5" fill="none" marker-end="url(#ad)"/>
+          <path d="M250,360 L430,400" stroke="#58a6ff" stroke-width="3" fill="none" marker-end="url(#ah)"/>
+          <path d="M540,480 L540,600" stroke="#6e7681" stroke-width="2" stroke-dasharray="5 5" fill="none" marker-end="url(#ad)"/>
+          <path d="M620,420 L730,300" stroke="#3fb950" stroke-width="2.5" fill="none" marker-end="url(#ag)"/>
+          <path d="M840,300 L850,420" stroke="#3fb950" stroke-width="2.5" fill="none" marker-end="url(#ag)"/>
+          <path d="M880,500 L955,555" stroke="#6e7681" stroke-width="2" stroke-dasharray="5 5" fill="none" marker-end="url(#ad)"/>
+        </svg>
+
+        <div class="node glass" style="left:60px; top:40px">
+          <div class="h"><div class="ic" style="background:rgba(247,120,186,0.15)">🧑‍💻</div>
+            <div><div class="n">Client</div><div class="k">web · mobile</div></div></div>
+          <div class="d">Sends the create-item request.</div>
+        </div>
+
+        <div class="node glass hot" style="left:60px; top:300px">
+          <div class="h"><div class="ic" style="background:rgba(88,166,255,0.15)">🚪</div>
+            <div><div class="n">API Gateway</div><div class="k mono">services/gateway</div></div></div>
+          <div class="d">Auth check + routing.</div>
+        </div>
+
+        <div class="node glass" style="left:400px; top:110px">
+          <div class="h"><div class="ic" style="background:rgba(230,180,80,0.15)">🔐</div>
+            <div><div class="n">Auth Service</div><div class="k mono">services/auth</div></div></div>
+          <div class="d">Validates the token.</div>
+        </div>
+
+        <div class="node glass hot" style="left:400px; top:360px">
+          <div class="h"><div class="ic" style="background:rgba(188,140,255,0.15)">📝</div>
+            <div><div class="n">Items Service</div><div class="k mono">services/items</div></div></div>
+          <div class="d">Creates the item, emits an event.</div>
+        </div>
+
+        <div class="node glass async" style="left:730px; top:200px">
+          <div class="h"><div class="ic" style="background:rgba(63,185,80,0.15)">📨</div>
+            <div><div class="n">Event Queue</div><div class="k mono">NATS</div></div></div>
+          <div class="d">item.created fan-out.</div>
+        </div>
+
+        <div class="node glass" style="left:760px; top:420px">
+          <div class="h"><div class="ic" style="background:rgba(240,136,62,0.15)">⚙️</div>
+            <div><div class="n">Workers</div><div class="k mono">workers/indexer</div></div></div>
+          <div class="d">Notify + update search.</div>
+        </div>
+
+        <div class="node glass" style="left:440px; top:600px">
+          <div class="h"><div class="ic" style="background:rgba(86,212,221,0.15)">🗄️</div>
+            <div><div class="n">Postgres</div><div class="k mono">users · items</div></div></div>
+          <div class="d">Source of truth.</div>
+        </div>
+
+        <div class="node glass" style="left:895px; top:530px">
+          <div class="h"><div class="ic" style="background:rgba(86,212,221,0.15)">🔎</div>
+            <div><div class="n">Search Index</div><div class="k mono">search</div></div></div>
+          <div class="d">Keeps items findable.</div>
+        </div>
+
+        <div class="flow-badge" style="left:120px; top:210px">① request</div>
+        <div class="flow-badge" style="left:300px; top:360px">② route</div>
+        <div class="flow-badge" style="left:650px; top:330px">③ emit</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>Legend</h3>
+      <div class="legend">
+        <div class="li"><span class="sw" style="background:var(--blue)"></span> Active request path</div>
+        <div class="li"><span class="sw" style="background:var(--green)"></span> Async event</div>
+        <div class="li"><span class="sw" style="background:var(--dim)"></span> Supporting call</div>
+      </div>
+
+      <div class="sel-card">
+        <div class="n">📝 Items Service</div>
+        <div class="kv"><span>Language</span><span class="mono">Go</span></div>
+        <div class="kv"><span>Entry</span><span class="mono">items/main.go</span></div>
+        <div class="kv"><span>Inbound</span><span>Gateway</span></div>
+        <div class="kv"><span>Outbound</span><span>DB · Events</span></div>
+        <div class="kv" style="border:none"><span>Owns tables</span><span class="mono">items</span></div>
+      </div>
+
+      <h3>Replay this flow</h3>
+      <div class="replay">
+        <div class="step"><span class="num">1</span><div><b>Client</b> → POST /items hits the <b>Gateway</b></div></div>
+        <div class="step"><span class="num">2</span><div><b>Gateway</b> verifies the token with <b>Auth</b>, routes to <b>Items</b></div></div>
+        <div class="step"><span class="num">3</span><div><b>Items</b> saves a row and emits <b>item.created</b></div></div>
+        <div class="step"><span class="num">4</span><div><b>Event Queue</b> fans the event out to <b>Workers</b></div></div>
+        <div class="step"><span class="num">5</span><div><b>Workers</b> update the search index &amp; notify separately</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

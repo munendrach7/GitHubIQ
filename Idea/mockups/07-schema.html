@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="style.css">
+<style>
+  .wrap { padding:26px 40px; }
+  .head { display:flex; align-items:center; gap:14px; }
+  .head h1 { font-size:26px; letter-spacing:-0.6px; }
+  .cap { color:var(--muted); font-size:14px; margin:6px 0 20px; }
+  .layout { display:grid; grid-template-columns: 1fr 360px; gap:22px; }
+  .erd { position:relative; height:660px; }
+  svg.rel { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+  .tbl { position:absolute; width:230px; border-radius:13px; overflow:hidden; }
+  .tbl .th { padding:11px 14px; font-weight:750; font-size:14px; display:flex; align-items:center; gap:8px;
+    background:linear-gradient(145deg, rgba(88,166,255,0.22), rgba(88,166,255,0.08)); border-bottom:1px solid var(--border-soft); }
+  .tbl.green .th { background:linear-gradient(145deg, rgba(63,185,80,0.22), rgba(63,185,80,0.08)); }
+  .tbl.purple .th { background:linear-gradient(145deg, rgba(188,140,255,0.22), rgba(188,140,255,0.08)); }
+  .tbl.orange .th { background:linear-gradient(145deg, rgba(240,136,62,0.22), rgba(240,136,62,0.08)); }
+  .col { display:flex; justify-content:space-between; padding:7px 14px; font-size:12.5px;
+    font-family:"SF Mono","Consolas",monospace; border-bottom:1px solid var(--border-soft); }
+  .col:last-child { border-bottom:none; }
+  .col .cn { color:var(--text); } .col .ct { color:var(--dim); }
+  .col.pk .cn::before { content:"🔑 "; } .col.fk .cn::before { content:"🔗 "; }
+  .col.pk { background:rgba(230,180,80,0.06); } .col.fk { background:rgba(88,166,255,0.05); }
+  .side { display:flex; flex-direction:column; gap:18px; }
+  .card { padding:20px; }
+  .card h3 { font-size:14px; text-transform:uppercase; letter-spacing:0.8px; color:var(--muted); margin-bottom:13px; display:flex; align-items:center; gap:8px; }
+  .card p { color:var(--muted); font-size:13.5px; line-height:1.6; }
+  .rel-li { display:flex; align-items:center; gap:9px; font-size:13px; padding:8px 0; border-bottom:1px solid var(--border-soft); }
+  .rel-li .mono { color:var(--text); } .rel-li .card-num { color:var(--purple); font-weight:800; margin-left:auto; }
+  .sample { font-family:"SF Mono","Consolas",monospace; font-size:11.5px; line-height:1.7; }
+  .sample .k{color:var(--pink)} .sample .s{color:var(--cyan)} .sample .n{color:var(--orange)} .sample .b{color:var(--blue)}
+</style>
+</head>
+<body>
+<div class="grid-overlay"></div>
+<div class="app">
+  <div class="topbar">
+    <div class="brand"><div class="logo">🩻</div>
+      <div><div class="name">GitHub<b>XRay</b></div><div class="sub">your-org/sample-app</div></div></div>
+    <div class="nav"><span>My Guide</span><span>Architecture</span><span>Data Flow</span><span class="active">Schema</span><span>Sandbox</span></div>
+    <div class="top-actions"><span class="pill"><span class="dot g"></span> Tables mapped</span><div class="avatar">MC</div></div>
+  </div>
+
+  <div class="wrap">
+    <div class="head"><span style="font-size:26px">🗄️</span><h1>Database schema, reverse-engineered</h1>
+      <span class="tag green">auto-detected</span></div>
+    <div class="cap">GitHubXRay read your migrations &amp; models and drew the map. Hover a key to see how tables connect.</div>
+
+    <div class="layout">
+      <div class="erd glass" style="padding:20px">
+        <svg class="rel" viewBox="0 0 760 620" preserveAspectRatio="none">
+          <path d="M180,150 C260,150 260,300 330,300" stroke="#58a6ff" stroke-width="2.5" fill="none"/>
+          <path d="M420,150 C500,150 500,300 470,300" stroke="#bc8cff" stroke-width="2.5" fill="none"/>
+          <path d="M440,360 C440,440 440,440 440,470" stroke="#3fb950" stroke-width="2.5" fill="none"/>
+          <path d="M330,330 C220,400 220,470 200,500" stroke="#f0883e" stroke-width="2.5" fill="none"/>
+        </svg>
+
+        <div class="tbl glass purple" style="left:24px; top:60px">
+          <div class="th">👤 users</div>
+          <div class="col pk"><span class="cn">id</span><span class="ct">uuid</span></div>
+          <div class="col"><span class="cn">email</span><span class="ct">text</span></div>
+          <div class="col"><span class="cn">name</span><span class="ct">text</span></div>
+          <div class="col"><span class="cn">created_at</span><span class="ct">timestamptz</span></div>
+        </div>
+
+        <div class="tbl glass" style="left:320px; top:210px">
+          <div class="th">📝 items</div>
+          <div class="col pk"><span class="cn">id</span><span class="ct">uuid</span></div>
+          <div class="col fk"><span class="cn">user_id</span><span class="ct">→ users</span></div>
+          <div class="col"><span class="cn">title</span><span class="ct">text</span></div>
+          <div class="col"><span class="cn">status</span><span class="ct">enum</span></div>
+          <div class="col"><span class="cn">created_at</span><span class="ct">timestamptz</span></div>
+        </div>
+
+        <div class="tbl glass green" style="left:330px; top:470px">
+          <div class="th">💬 comments</div>
+          <div class="col pk"><span class="cn">id</span><span class="ct">uuid</span></div>
+          <div class="col fk"><span class="cn">item_id</span><span class="ct">→ items</span></div>
+          <div class="col fk"><span class="cn">user_id</span><span class="ct">→ users</span></div>
+          <div class="col"><span class="cn">body</span><span class="ct">text</span></div>
+        </div>
+
+        <div class="tbl glass orange" style="left:40px; top:430px">
+          <div class="th">🗂️ activity_log</div>
+          <div class="col pk"><span class="cn">id</span><span class="ct">bigserial</span></div>
+          <div class="col fk"><span class="cn">item_id</span><span class="ct">→ items</span></div>
+          <div class="col"><span class="cn">action</span><span class="ct">text</span></div>
+          <div class="col"><span class="cn">at</span><span class="ct">timestamptz</span></div>
+        </div>
+
+        <div class="tbl glass" style="left:540px; top:60px">
+          <div class="th">🏷️ tags</div>
+          <div class="col pk"><span class="cn">id</span><span class="ct">uuid</span></div>
+          <div class="col fk"><span class="cn">item_id</span><span class="ct">→ items</span></div>
+          <div class="col"><span class="cn">label</span><span class="ct">text</span></div>
+        </div>
+      </div>
+
+      <div class="side">
+        <div class="card glass">
+          <h3>🔗 Relationships</h3>
+          <div class="rel-li"><span class="mono">users → items</span><span class="card-num">1 : N</span></div>
+          <div class="rel-li"><span class="mono">items → comments</span><span class="card-num">1 : N</span></div>
+          <div class="rel-li"><span class="mono">items → activity_log</span><span class="card-num">1 : N</span></div>
+          <div class="rel-li" style="border:none"><span class="mono">items → tags</span><span class="card-num">1 : N</span></div>
+        </div>
+
+        <div class="card glass">
+          <h3>💡 Plain-English</h3>
+          <p>A <b>user</b> owns many <b>items</b>. Each item can collect several <b>comments</b> and <b>tags</b>, and every change to it is recorded in the append-only <b>activity_log</b> — a clear history you can always replay.</p>
+        </div>
+
+        <div class="card glass">
+          <h3>🔎 Sample row · items</h3>
+          <div class="sample">
+{<br>
+&nbsp;&nbsp;<span class="b">"id"</span>: <span class="s">"it_5521"</span>,<br>
+&nbsp;&nbsp;<span class="b">"user_id"</span>: <span class="s">"u_1042"</span>,<br>
+&nbsp;&nbsp;<span class="b">"title"</span>: <span class="s">"Design spec"</span>,<br>
+&nbsp;&nbsp;<span class="b">"status"</span>: <span class="s">"draft"</span><br>
+}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

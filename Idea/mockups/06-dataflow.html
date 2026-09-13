@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="style.css">
+<style>
+  .wrap { padding:26px 40px; }
+  .head { display:flex; align-items:center; gap:14px; margin-bottom:4px; }
+  .head h1 { font-size:26px; letter-spacing:-0.6px; }
+  .cap { color:var(--muted); font-size:14px; margin-bottom:22px; }
+  .track { display:grid; grid-template-columns: repeat(5, 1fr); gap:0; align-items:stretch; }
+  .stage { position:relative; padding:0 12px; }
+  .stage:not(:last-child)::after { content:"➜"; position:absolute; right:-11px; top:50px; font-size:22px; color:var(--blue); z-index:3; }
+  .stage .cap-top { display:flex; align-items:center; gap:9px; margin-bottom:10px; }
+  .stage .num { width:26px;height:26px;border-radius:50%;background:linear-gradient(145deg,#1f6feb,#6f42c1);
+    display:grid;place-items:center;font-size:13px;font-weight:800; }
+  .stage .svc { font-weight:750; font-size:14.5px; }
+  .stage .loc { font-size:11px; color:var(--dim); margin-left:auto; }
+  .code { padding:14px; border-radius:12px; font-family:"SF Mono","Consolas",monospace; font-size:11.5px;
+    line-height:1.6; min-height:220px; }
+  .code .c { color:var(--dim); } .code .k { color:var(--pink); } .code .s { color:var(--cyan); }
+  .code .n { color:var(--orange); } .code .b { color:var(--blue); } .code .g { color:var(--green); }
+  .note { margin-top:10px; font-size:12px; color:var(--muted); line-height:1.5;
+    padding:11px 12px; border-radius:10px; background:rgba(88,166,255,0.06); border:1px solid rgba(88,166,255,0.18); }
+  .note b { color:var(--text); }
+  .explain { display:grid; grid-template-columns: 1.3fr 1fr; gap:20px; margin-top:26px; }
+  .ex { padding:22px; }
+  .ex h3 { font-size:16px; margin-bottom:12px; display:flex; align-items:center; gap:9px; }
+  .ex p { color:var(--muted); font-size:14px; line-height:1.6; }
+  .ex .hl { color:var(--text); background:rgba(188,140,255,0.14); padding:1px 6px; border-radius:5px; }
+  .sa .row { display:flex; gap:12px; align-items:center; font-size:13px; padding:9px 0; border-bottom:1px solid var(--border-soft); }
+  .sa .row .desc { color:var(--muted); margin-left:2px; }
+  .sa .row .type { font-size:10.5px; font-weight:800; padding:2px 7px; border-radius:6px; }
+  .sync{ background:rgba(88,166,255,0.15); color:var(--blue) } .async{ background:rgba(63,185,80,0.15); color:var(--green) }
+</style>
+</head>
+<body>
+<div class="grid-overlay"></div>
+<div class="app">
+  <div class="topbar">
+    <div class="brand"><div class="logo">🩻</div>
+      <div><div class="name">GitHub<b>XRay</b></div><div class="sub">your-org/sample-app</div></div></div>
+    <div class="nav"><span>My Guide</span><span>Architecture</span><span class="active">Data Flow</span><span>Schema</span><span>Sandbox</span></div>
+    <div class="top-actions"><span class="pill"><span class="dot p"></span> Flow: POST /items</span><div class="avatar">MC</div></div>
+  </div>
+
+  <div class="wrap">
+    <div class="head"><span style="font-size:26px">🌊</span><h1>Follow a real request, value by value</h1>
+      <span class="tag purple">with example data</span></div>
+    <div class="cap">This is exactly what happens when a user creates a <b>new item</b> — watch the payload transform at every hop.</div>
+
+    <div class="track">
+      <div class="stage">
+        <div class="cap-top"><span class="num">1</span><span class="svc">Client</span><span class="loc mono">web</span></div>
+        <div class="code glass">
+<span class="c">// user submits form</span><br>
+<span class="k">POST</span> <span class="s">/items</span><br>
+{<br>
+&nbsp;&nbsp;<span class="b">"title"</span>: <span class="s">"Design spec"</span>,<br>
+&nbsp;&nbsp;<span class="b">"body"</span>: <span class="s">"First draft…"</span>,<br>
+&nbsp;&nbsp;<span class="b">"token"</span>: <span class="s">"eyJhbG…"</span><br>
+}
+        </div>
+        <div class="note">The item's content plus the user's <b>token</b> — that's all the client sends. 💡</div>
+      </div>
+
+      <div class="stage">
+        <div class="cap-top"><span class="num">2</span><span class="svc">Gateway</span><span class="loc mono">gateway</span></div>
+        <div class="code glass">
+<span class="c">// verify + enrich</span><br>
+<span class="k">auth</span>.verify(<span class="s">token</span>)<br>
+<span class="g">✓ userId = u_1042</span><br><br>
+<span class="k">forward →</span> items<br>
+{<br>
+&nbsp;&nbsp;<span class="b">"userId"</span>: <span class="s">"u_1042"</span>,<br>
+&nbsp;&nbsp;<span class="b">"title"</span>: <span class="s">"Design spec"</span><br>
+}
+        </div>
+        <div class="note">Token becomes a trusted <b>userId</b>. Downstream never sees raw tokens.</div>
+      </div>
+
+      <div class="stage">
+        <div class="cap-top"><span class="num">3</span><span class="svc">Items</span><span class="loc mono">items</span></div>
+        <div class="code glass">
+<span class="c">// save + announce</span><br>
+item := <span class="k">INSERT</span><br>
+&nbsp;&nbsp;id=<span class="s">"it_5521"</span><br>
+&nbsp;&nbsp;user=<span class="s">"u_1042"</span><br>
+&nbsp;&nbsp;status=<span class="s">"draft"</span><br><br>
+<span class="k">emit →</span> <span class="s">item.created</span>
+        </div>
+        <div class="note">The item is <b>saved first</b>, then an event announces it — extra work happens separately.</div>
+      </div>
+
+      <div class="stage">
+        <div class="cap-top"><span class="num">4</span><span class="svc">Events</span><span class="loc mono">queue</span></div>
+        <div class="code glass">
+<span class="c">// fan-out</span><br>
+queue <span class="s">item.created</span><br>
+{ id:<span class="s">"it_5521"</span> }<br><br>
+<span class="k">deliver →</span><br>
+&nbsp;&nbsp;🔔 notifier<br>
+&nbsp;&nbsp;🔎 search<br>
+&nbsp;&nbsp;🗂️ activity
+        </div>
+        <div class="note">One event, many <b>independent</b> reactions. Services stay decoupled.</div>
+      </div>
+
+      <div class="stage">
+        <div class="cap-top"><span class="num">5</span><span class="svc">Workers</span><span class="loc mono">workers</span></div>
+        <div class="code glass">
+<span class="c">// async reactions</span><br>
+on <span class="s">item.created</span>:<br><br>
+🔔 notify followers<br>
+🔎 index for search<br>
+🗂️ write <span class="g">activity_log</span><br><br>
+<span class="c">// response already</span><br>
+<span class="c">// returned to user</span>
+        </div>
+        <div class="note">These run <b>after</b> the response is sent, so the request path stays simple. ⚡</div>
+      </div>
+    </div>
+
+    <div class="explain">
+      <div class="ex glass">
+        <h3>🧠 Why it’s built this way</h3>
+        <p>The request is split into a <span class="hl">synchronous core</span> (verify → save item → respond) and <span class="hl">asynchronous follow-ups</span> (notify, index, log). This keeps the request path short and makes the extra work <b>independently retryable</b> without holding up the response. The <span class="hl">draft → published</span> lifecycle and the <span class="hl">activity_log</span> give a clear, reconstructable history of what happened to every item.</p>
+      </div>
+      <div class="ex glass">
+        <h3>⚙️ Sync vs. async at a glance</h3>
+        <div class="sa">
+          <div class="row"><span class="type sync">SYNC</span> Gateway verifies the token &amp; routes</div>
+          <div class="row"><span class="type sync">SYNC</span> Items service saves the row</div>
+          <div class="row"><span class="type sync">SYNC</span> Response returns to the user</div>
+          <div class="row"><span class="type async">ASYNC</span> Notify followers</div>
+          <div class="row"><span class="type async">ASYNC</span> Update the search index</div>
+          <div class="row"><span class="type async">ASYNC</span> Write the activity log</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

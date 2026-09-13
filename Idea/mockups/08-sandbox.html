@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="style.css">
+<style>
+  .wrap { padding:22px 34px; }
+  .head { display:flex; align-items:center; gap:14px; }
+  .head h1 { font-size:25px; letter-spacing:-0.6px; }
+  .cap { color:var(--muted); font-size:14px; margin:6px 0 18px; }
+  .ide { display:grid; grid-template-columns: 210px 1fr 400px; height:700px; border-radius:15px; overflow:hidden; }
+  .tree { background:rgba(1,4,9,0.5); border-right:1px solid var(--border-soft); padding:14px 10px; }
+  .tree .t { font-size:11px; text-transform:uppercase; letter-spacing:1px; color:var(--dim); padding:4px 8px 10px; }
+  .file { display:flex; align-items:center; gap:8px; padding:6px 9px; border-radius:7px; font-size:13px; color:var(--muted); }
+  .file.dir { color:var(--text); font-weight:600; }
+  .file.active { background:rgba(88,166,255,0.12); color:var(--text); }
+  .file.indent { margin-left:16px; }
+  .editor { background:rgba(13,17,23,0.7); display:flex; flex-direction:column; }
+  .tabs { display:flex; border-bottom:1px solid var(--border-soft); background:rgba(1,4,9,0.4); }
+  .tab { padding:11px 18px; font-size:13px; color:var(--muted); border-right:1px solid var(--border-soft); }
+  .tab.active { background:rgba(13,17,23,0.9); color:var(--text); box-shadow:inset 0 2px 0 var(--blue); }
+  .codearea { padding:16px 18px; font-family:"SF Mono","Consolas",monospace; font-size:13px; line-height:1.75; flex:1; }
+  .ln { color:var(--dim); display:inline-block; width:26px; user-select:none; }
+  .k{color:var(--pink)} .s{color:var(--cyan)} .n{color:var(--orange)} .b{color:var(--blue)} .g{color:var(--green)} .c{color:var(--dim)} .f{color:var(--purple)}
+  .preview { background:rgba(1,4,9,0.5); border-left:1px solid var(--border-soft); display:flex; flex-direction:column; }
+  .pv-bar { display:flex; align-items:center; gap:10px; padding:11px 15px; border-bottom:1px solid var(--border-soft); font-size:13px; color:var(--muted); }
+  .pv-bar .u { flex:1; background:rgba(240,246,252,0.04); border-radius:7px; padding:5px 11px; font-family:monospace; font-size:12px; }
+  .pv-body { padding:18px; flex:1; }
+  .demo-app { border-radius:12px; padding:18px; background:linear-gradient(160deg,#0d1117,#161b22); border:1px solid var(--border-soft); }
+  .demo-app h4 { font-size:15px; margin-bottom:14px; }
+  .field { margin-bottom:12px; }
+  .field label { display:block; font-size:12px; color:var(--muted); margin-bottom:5px; }
+  .field .inp { padding:9px 12px; border-radius:8px; background:rgba(240,246,252,0.04); border:1px solid var(--border-soft); font-size:13px; }
+  .create-btn { margin-top:6px; width:100%; padding:12px; border-radius:10px; border:none; font-weight:800; font-size:14px;
+    background:linear-gradient(145deg,#1f6feb,#6f42c1); color:#fff; }
+  .console { margin-top:14px; border-radius:10px; background:#010409; border:1px solid var(--border-soft); padding:12px; font-family:monospace; font-size:11.5px; line-height:1.7; }
+  .console .ok{color:var(--green)} .console .info{color:var(--blue)} .console .dim2{color:var(--dim)}
+  .try { display:flex; align-items:center; gap:10px; margin-top:14px; padding:11px 13px; border-radius:10px;
+    background:rgba(63,185,80,0.08); border:1px solid rgba(63,185,80,0.25); font-size:12.5px; color:var(--muted); }
+  .callout { padding:12px 15px; border-radius:11px; font-family:-apple-system,sans-serif; font-size:13px;
+    background:rgba(188,140,255,0.1); border-left:3px solid var(--purple); color:var(--muted); }
+  .callout b { color:var(--text); }
+  .tips { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:18px; }
+</style>
+</head>
+<body>
+<div class="grid-overlay"></div>
+<div class="app">
+  <div class="topbar">
+    <div class="brand"><div class="logo">🩻</div>
+      <div><div class="name">GitHub<b>XRay</b></div><div class="sub">your-org/sample-app</div></div></div>
+    <div class="nav"><span>My Guide</span><span>Architecture</span><span>Data Flow</span><span>Schema</span><span class="active">Sandbox</span></div>
+    <div class="top-actions"><button class="btn">⤴ Export as HTML/CSS/JS</button><div class="avatar">MC</div></div>
+  </div>
+
+  <div class="wrap">
+    <div class="head"><span style="font-size:25px">🎮</span><h1>The playable sandbox</h1>
+      <span class="tag cyan">runs in your browser</span></div>
+    <div class="cap">A safe, self-contained replica of a core flow. Change the inputs, run it, and watch the real path react — no backend, no risk.</div>
+
+    <div class="ide glass">
+      <div class="tree">
+        <div class="t">Sandbox files</div>
+        <div class="file dir">📂 create-item-demo</div>
+        <div class="file indent active">📄 index.html</div>
+        <div class="file indent">🎨 styles.css</div>
+        <div class="file indent">⚡ create-item.js</div>
+        <div class="file indent">🗂️ mock-api.js</div>
+        <div class="file indent">📊 flow-trace.js</div>
+        <div class="t" style="margin-top:16px">Lesson</div>
+        <div class="file">📖 Walkthrough</div>
+        <div class="file">✅ Challenge: add a tag</div>
+      </div>
+
+      <div class="editor">
+        <div class="tabs">
+          <div class="tab active">create-item.js</div>
+          <div class="tab">mock-api.js</div>
+        </div>
+        <div class="codearea">
+<span class="ln">1</span><span class="c">// 🎓 Tutor: this mirrors services/items/create.go</span><br>
+<span class="ln">2</span><span class="k">async function</span> <span class="f">createItem</span>(input) {<br>
+<span class="ln">3</span>&nbsp;&nbsp;<span class="k">const</span> user = <span class="k">await</span> <span class="f">auth</span>.<span class="f">verify</span>(input.<span class="b">token</span>);<br>
+<span class="ln">4</span>&nbsp;&nbsp;<span class="k">const</span> item = <span class="k">await</span> <span class="f">db</span>.<span class="f">items</span>.<span class="f">insert</span>({<br>
+<span class="ln">5</span>&nbsp;&nbsp;&nbsp;&nbsp;userId: user.<span class="b">id</span>, title: input.<span class="b">title</span>, status: <span class="s">"draft"</span><br>
+<span class="ln">6</span>&nbsp;&nbsp;});<br>
+<span class="ln">7</span>&nbsp;&nbsp;<span class="f">events</span>.<span class="f">emit</span>(<span class="s">"item.created"</span>, item);<br>
+<span class="ln">8</span>&nbsp;&nbsp;<span class="k">return</span> { ok: <span class="g">true</span>, id: item.<span class="b">id</span> };<br>
+<span class="ln">9</span>}
+        </div>
+      </div>
+
+      <div class="preview">
+        <div class="pv-bar">▶ <span class="u">localhost:sandbox/create-item-demo</span> ⟳</div>
+        <div class="pv-body">
+          <div class="demo-app">
+            <h4>📝 Sample App · New item</h4>
+            <div class="field"><label>Title</label><div class="inp">Design spec</div></div>
+            <div class="field"><label>Visibility</label><div class="inp">Draft</div></div>
+            <button class="create-btn">Create item</button>
+            <div class="console">
+<span class="dim2">// live flow trace</span><br>
+<span class="info">→ auth.verify</span> ✓ user u_1042<br>
+<span class="info">→ items.insert</span> it_5521 <span class="dim2">(draft)</span><br>
+<span class="info">→ emit item.created</span><br>
+<span class="ok">✓ created · item it_5521</span><br>
+<span class="dim2">→ workers: notify · index · log …</span><br>
+<span class="ok">🔎 indexed for search</span>
+            </div>
+          </div>
+          <div class="try">🧪 <div>Your turn: open <b>Challenge: add a tag</b> and attach a tag to the new item. The tutor checks your work.</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tips">
+      <div class="callout">💡 <b>Line 5:</b> the item is saved as <b>draft</b> first — try making the insert fail in <b>mock-api.js</b> and watch the flow stop cleanly before any event is emitted.</div>
+      <div class="callout">📚 <b>New to Go?</b> This JS mirrors the Go version. Hover any line to see the original <span style="color:var(--text)">.go</span> side-by-side.</div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

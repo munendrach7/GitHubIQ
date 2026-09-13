@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="style.css">
+<style>
+  .wrap { padding:30px 44px; }
+  .head { text-align:center; margin-bottom:22px; }
+  .head h1 { font-size:32px; letter-spacing:-1px; }
+  .head p { color:var(--muted); font-size:15px; margin-top:8px; }
+  .diagram { position:relative; }
+  .cols { display:grid; grid-template-columns: 200px 1fr 220px; gap:26px; align-items:stretch; }
+  .layer { border-radius:16px; padding:18px 16px; }
+  .layer .lt { font-size:11px; text-transform:uppercase; letter-spacing:1.2px; color:var(--dim); text-align:center; margin-bottom:14px; }
+  .box { padding:14px; border-radius:12px; background:rgba(240,246,252,0.03); border:1px solid var(--border-soft); margin-bottom:12px; }
+  .box .bt { font-weight:700; font-size:14px; display:flex; align-items:center; gap:9px; }
+  .box .bd { color:var(--muted); font-size:12px; margin-top:5px; line-height:1.45; }
+  .box:last-child { margin-bottom:0; }
+  /* agents grid */
+  .agents-wrap { text-align:center; }
+  .orch { padding:12px; border-radius:12px; background:linear-gradient(145deg, rgba(88,166,255,0.16), rgba(188,140,255,0.12));
+    border:1px solid rgba(88,166,255,0.35); margin-bottom:16px; }
+  .orch .bt { justify-content:center; font-size:15px; }
+  .orch .bd { text-align:center; }
+  .agrid { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+  .ag { padding:14px 10px; border-radius:12px; background:rgba(240,246,252,0.03); border:1px solid var(--border-soft); text-align:center; }
+  .ag .ic { font-size:24px; } .ag .n { font-weight:700; font-size:13px; margin-top:6px; }
+  .ag .d { font-size:11px; color:var(--muted); margin-top:4px; line-height:1.35; }
+  .ag.a1{border-color:rgba(88,166,255,0.4)} .ag.a2{border-color:rgba(188,140,255,0.4)}
+  .ag.a3{border-color:rgba(63,185,80,0.4)} .ag.a4{border-color:rgba(240,136,62,0.4)}
+  .ag.a5{border-color:rgba(247,120,186,0.4)} .ag.a6{border-color:rgba(86,212,221,0.4)}
+  .busline { text-align:center; margin-top:16px; padding:11px; border-radius:11px;
+    background:rgba(63,185,80,0.08); border:1px dashed rgba(63,185,80,0.35); font-size:12.5px; color:var(--muted); }
+  .arrow-lane { display:grid; place-items:center; }
+  .arrow-lane .a { font-size:30px; color:var(--blue); }
+  .flowbar { display:flex; justify-content:center; gap:0; margin-top:24px; }
+  .fb { display:flex; align-items:center; gap:14px; }
+  .fb .s { padding:9px 16px; border-radius:10px; font-size:13px; font-weight:700; background:rgba(240,246,252,0.03); border:1px solid var(--border-soft); }
+  .fb .arr { color:var(--blue); font-size:18px; }
+  .principles { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-top:26px; }
+  .pr { padding:16px; border-radius:13px; }
+  .pr .ic { font-size:22px; } .pr h4 { font-size:14px; margin:8px 0 5px; } .pr p { color:var(--muted); font-size:12.5px; line-height:1.5; }
+</style>
+</head>
+<body>
+<div class="grid-overlay"></div>
+<div class="app">
+  <div class="topbar">
+    <div class="brand"><div class="logo">🩻</div>
+      <div><div class="name">GitHub<b>XRay</b></div><div class="sub">your Project Tutor</div></div></div>
+    <div class="nav"><span>Overview</span><span class="active">System Architecture</span><span>Agents</span></div>
+    <div class="top-actions"><span class="pill"><span class="dot p"></span> How it works</span></div>
+  </div>
+
+  <div class="wrap">
+    <div class="head">
+      <h1>🏗️ How GitHubXRay works under the hood</h1>
+      <p>An asynchronous, multi-agent pipeline that turns a raw repository into a living, interactive onboarding guide.</p>
+    </div>
+
+    <div class="cols">
+      <!-- INPUT / INGESTION -->
+      <div class="layer glass">
+        <div class="lt">① Ingest</div>
+        <div class="box"><div class="bt">🔗 Repo Connector</div><div class="bd">Public URL or authenticated private repo. Nothing leaves your workspace.</div></div>
+        <div class="box"><div class="bt">📥 Clone &amp; Index</div><div class="bd">Parses file tree, languages, configs &amp; git history.</div></div>
+        <div class="box"><div class="bt">📝 Preference Intake</div><div class="bd">Questionnaire → learner profile &amp; goals.</div></div>
+      </div>
+
+      <!-- AGENTS -->
+      <div class="layer glass agents-wrap">
+        <div class="lt">② Multi-agent analysis · runs asynchronously</div>
+        <div class="orch">
+          <div class="bt">🧠 Orchestrator</div>
+          <div class="bd">Schedules agents, resolves dependencies, merges findings into a shared knowledge graph.</div>
+        </div>
+        <div class="agrid">
+          <div class="ag a1"><div class="ic">🧭</div><div class="n">Explorer</div><div class="d">Maps structure &amp; entry points</div></div>
+          <div class="ag a2"><div class="ic">🏛️</div><div class="n">Architect</div><div class="d">Services &amp; interactions</div></div>
+          <div class="ag a3"><div class="ic">🗄️</div><div class="n">Schema</div><div class="d">Models &amp; relations</div></div>
+          <div class="ag a4"><div class="ic">🌊</div><div class="n">Data-Flow</div><div class="d">Traces with example values</div></div>
+          <div class="ag a5"><div class="ic">🎓</div><div class="n">Tutor</div><div class="d">Language fundamentals</div></div>
+          <div class="ag a6"><div class="ic">🎮</div><div class="n">Sandbox</div><div class="d">Builds playground</div></div>
+        </div>
+        <div class="busline">🔄 Shared knowledge graph &amp; message bus — agents publish findings the others build on</div>
+      </div>
+
+      <!-- OUTPUT -->
+      <div class="layer glass">
+        <div class="lt">③ Synthesize &amp; deliver</div>
+        <div class="box"><div class="bt">🧩 Guide Composer</div><div class="bd">Assembles lessons in a Learn-style navigator tailored to the learner.</div></div>
+        <div class="box"><div class="bt">🎨 Interactive Renderer</div><div class="bd">Live architecture maps, data-flow &amp; schema visualizers.</div></div>
+        <div class="box"><div class="bt">📦 Standalone Export</div><div class="bd">Self-contained HTML / CSS / JS you can run locally. No lock-in.</div></div>
+      </div>
+    </div>
+
+    <div class="flowbar">
+      <div class="fb">
+        <span class="s">🔗 Repo in</span><span class="arr">→</span>
+        <span class="s">📝 Tailor</span><span class="arr">→</span>
+        <span class="s">🤖 Agents analyze</span><span class="arr">→</span>
+        <span class="s">🧩 Compose guide</span><span class="arr">→</span>
+        <span class="s">🎮 Explore &amp; export</span>
+      </div>
+    </div>
+
+    <div class="principles">
+      <div class="pr glass"><div class="ic">⚡</div><h4>Asynchronous by design</h4><p>Specialist agents work in parallel, each focused on its own domain.</p></div>
+      <div class="pr glass"><div class="ic">🧠</div><h4>Specialist agents</h4><p>Each agent is an expert in one domain — depth without a monolithic prompt.</p></div>
+      <div class="pr glass"><div class="ic">🎯</div><h4>Learner-tailored</h4><p>Your role, skill level &amp; goals shape what the guide emphasizes.</p></div>
+      <div class="pr glass"><div class="ic">🔓</div><h4>No lock-in</h4><p>Everything exports to plain files you own and can host anywhere.</p></div>
+    </div>
+  </div>
+</div>
+</body>
+</html>
