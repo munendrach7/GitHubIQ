@@ -6,7 +6,8 @@ const mockDir = path.join(__dirname, 'mockups');
 const outDir = path.join(__dirname, 'screenshots');
 if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
 
-const files = fs.readdirSync(mockDir).filter(f => f.endsWith('.html'));
+const files = fs.readdirSync(mockDir).filter(f => f.endsWith('.html'))
+  .filter(f => !process.env.ONLY || process.env.ONLY.split(',').includes(f));
 
 (async () => {
   const browser = await puppeteer.launch({ headless: 'new', args: ['--no-sandbox', '--force-color-profile=srgb'] });
