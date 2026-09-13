@@ -600,6 +600,12 @@ a {
 
 /* Data-flow: vertical step rail on the left + detail on the right */
 .flow-layout { display: grid; grid-template-columns: 260px 1fr; gap: 16px; align-items: start; }
+/* Per-endpoint tabs across the top of the data-flow view */
+.flow-endpoint-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+.endpoint-tab { display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 10px; cursor: pointer; border: 1px solid var(--border); background: var(--panel-solid); color: var(--muted); transition: all 0.15s; max-width: 320px; }
+.endpoint-tab:hover { color: var(--text); border-color: color-mix(in srgb, var(--blue) 40%, var(--border)); }
+.endpoint-tab.on { border-color: var(--blue); color: var(--text); box-shadow: 0 0 0 3px color-mix(in srgb, var(--blue) 18%, transparent); }
+.endpoint-tab-route { font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .flow-rail-v { position: sticky; top: 16px; display: flex; flex-direction: column; gap: 4px; max-height: calc(100vh - 40px); overflow-y: auto; padding-right: 4px; }
 .rail-node-v { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--border); background: var(--panel-solid); color: var(--muted); cursor: pointer; text-align: left; transition: all 0.15s; position: relative; }
 .rail-node-v::before { content: ""; position: absolute; left: 23px; top: -4px; height: 4px; width: 2px; background: var(--border); }

@@ -1,20 +1,17 @@
-"""Data-Flow agent — traces the main request/operation end to end, in depth."""
+"""Data-Flow agent — traces every API endpoint / entry operation end to end."""
 from __future__ import annotations
 
 from ..llm import invoke_json
 from ..compaction import compact_files
-from ..models import DataFlow, FlowStep
+from ..models import DataFlow, EndpointFlow, FlowStep
 from ..prompts import render
 from ..scale import compute_scale
 from .state import GraphState
 
 SYSTEM = (
-    "You are the Data-Flow agent. Using the architecture and the assigned source "
-    "files, you trace the single most important operation through the codebase "
-    "hop by hop. For each hop you show: which component/file handles it, the data "
-    "entering and leaving, a short real code snippet, whether it is sync or async, "
-    "and a deeper explanation a newcomer can click to expand. Respond ONLY with "
-    "strict JSON."
+    "You are the Data-Flow agent. You enumerate the application's API endpoints / "
+    "entry operations and trace each one's logic flow through the codebase hop by "
+    "hop. Respond ONLY with strict JSON."
 )
 
 
@@ -24,12 +21,21 @@ def _heuristic(ctx, arch) -> DataFlow:
         FlowStep(index=i + 1, actor=actor, label="handles the request", kind="sync")
         for i, actor in enumerate(actors)
     ]
-    return DataFlow(
+    primary = EndpointFlow(
+        id="main",
         title=f"A request through {ctx.meta.name}",
         trigger="A user action",
         summary="High-level path across the main components.",
         steps=steps,
         rationale="Generated from the component graph.",
+    )
+    return DataFlow(
+        title=primary.title,
+        trigger=primary.trigger,
+        summary=primary.summary,
+        steps=primary.steps,
+        rationale=primary.rationale,
+        endpoints=[primary],
     )
 
 
@@ -39,7 +45,7 @@ def run(state: GraphState) -> dict:
     arch = state["architecture"]
     brief = state["research"]
     schema = state.get("schema")
-    reporter.update("Data-Flow", "running", "Tracing the main operation end to end")
+    reporter.update("Data-Flow", "running", "Tracing every endpoint end to end")
 
     scale = compute_scale(ctx.meta.file_count, getattr(state.get("preferences"), "depth", None))
     fallback = _heuristic(ctx, arch)
@@ -51,9 +57,11 @@ def run(state: GraphState) -> dict:
         ctx,
         brief.file_assignments.get("dataflow", []),
         budget=240_000,
-        focus="the end-to-end path of the main operation: route -> handler -> "
-        "service -> data layer, with the data entering and leaving each hop",
+        focus="every API endpoint / route / controller / resolver / consumer / CLI "
+        "command and the end-to-end path each one takes (handler -> service -> data)",
     ) or ctx.sampled_sources(12)
+    # How many distinct endpoints to trace scales with repo size / depth.
+    endpoint_max = min(16, max(4, scale.steps[1]))
     prompt = render(
         "dataflow_user",
         owner=ctx.meta.owner,
@@ -62,26 +70,49 @@ def run(state: GraphState) -> dict:
         nodes=node_summary,
         tables=tables,
         sources=sources,
+        endpoint_max=endpoint_max,
         step_min=scale.steps[0],
         step_max=scale.steps[1],
     )
     data = invoke_json(render("dataflow_system"), prompt, default=None)
 
-    flow = fallback
-    if isinstance(data, dict) and data.get("steps"):
-        try:
-            flow = DataFlow.model_validate(
-                {
-                    "title": data.get("title", fallback.title),
-                    "trigger": data.get("trigger", ""),
-                    "summary": data.get("summary", fallback.summary),
-                    "steps": data["steps"],
-                    "rationale": data.get("rationale", fallback.rationale),
-                    "alternatives": data.get("alternatives", []),
-                }
-            )
-        except Exception:  # noqa: BLE001
-            flow = fallback
+    endpoints: list[EndpointFlow] = []
+    if isinstance(data, dict) and isinstance(data.get("endpoints"), list):
+        for i, ep in enumerate(data["endpoints"][:endpoint_max]):
+            if not isinstance(ep, dict) or not ep.get("steps"):
+                continue
+            try:
+                endpoints.append(
+                    EndpointFlow.model_validate(
+                        {
+                            "id": ep.get("id") or f"ep{i + 1}",
+                            "method": (ep.get("method") or "").upper(),
+                            "route": ep.get("route", ""),
+                            "title": ep.get("title") or ep.get("route") or f"Flow {i + 1}",
+                            "trigger": ep.get("trigger", ""),
+                            "summary": ep.get("summary", ""),
+                            "steps": ep.get("steps", []),
+                            "rationale": ep.get("rationale", ""),
+                        }
+                    )
+                )
+            except Exception:  # noqa: BLE001
+                continue
 
-    reporter.update("Data-Flow", "done", f"{len(flow.steps)} hops traced")
+    if endpoints:
+        primary = endpoints[0]
+        flow = DataFlow(
+            title=primary.title or fallback.title,
+            trigger=primary.trigger,
+            summary=primary.summary or fallback.summary,
+            steps=primary.steps,
+            rationale=primary.rationale,
+            endpoints=endpoints,
+        )
+    else:
+        flow = fallback
+
+    reporter.update(
+        "Data-Flow", "done", f"{len(flow.endpoints)} endpoint flow(s) traced"
+    )
     return {"dataflow": flow}

@@ -78,8 +78,13 @@ You delegate work to five specialists and must give each a precise, high-signal 
 reading list drawn from the real file tree:
 - architect  — files that reveal services/modules and how they wire together
   (entry points, app/server setup, routers, DI, inter-service calls, config).
-- schema     — migrations, ORM models, entities, SQL, prisma/schema files. Empty
-  list if there is genuinely no database.
+- schema     — the PERSISTENCE layer in any form: ORM models/entities (incl. EF
+  Core DbContext + DbSet<> + entity classes, SQLAlchemy, Django, Sequelize,
+  TypeORM, Prisma, GORM, ActiveRecord, JPA/Hibernate, Mongoose/Beanie), SQL &
+  migrations, NoSQL collections/documents, vector stores (Chroma/Pinecone/Qdrant/
+  Weaviate/FAISS), file/embedded DBs (SQLite/LiteDB/Realm), and the DB config /
+  connection strings (appsettings.json, .env, config). Assign ALL of these; use an
+  empty list only if the project genuinely persists nothing.
 - dataflow   — the files that implement the single most important request/operation
   end to end (route -> handler -> service -> data layer).
 - tutor      — files that best showcase the key language/framework idioms used here.
@@ -112,6 +117,8 @@ reference real modules/paths)",
   "modules": ["top-level dirs/packages that matter"],
   "languages": ["..."],
   "has_database": true|false,
+  "database": "name the persistence tech if any (e.g. 'PostgreSQL', 'MongoDB', \
+'SQL Server via EF Core', 'SQLite', 'Chroma vector store'), else ''",
   "components": [{"id": "slug", "name": "Human Name", \
 "kind": "frontend|backend service|worker|library|cli|infra|database", \
 "path": "root/path", "tech": ["real libs/frameworks seen"], \
@@ -132,8 +139,12 @@ per specialist (fewer only if the repo is tiny), ordered most-important first. \
 Include EVERY file a specialist genuinely needs — do not under-assign and cause \
 them to miss context. Identify EVERY significant component (this is a $size_label \
 repo — expect roughly $component_min-$component_max components, but include MORE \
-if the code genuinely has more; never merge distinct services). If there is no \
-database, set has_database=false and schema=[]."""
+if the code genuinely has more; never merge distinct services). Components must be \
+REAL architectural units (a service, API layer, worker, UI app, library, database, \
+external integration) named for what they DO — NEVER just a raw top-level folder \
+name. If there is no persistence at all, set has_database=false, database='' and \
+schema=[]; otherwise name the database technology and assign every model/entity/ \
+migration/db-config file to the schema specialist."""
 )
 
 
@@ -182,7 +193,16 @@ databases, queues, external services, UI). Scale the count to the system's real 
 size — a large repo ($size_label) must not be collapsed into a handful of nodes; \
 represent every significant service/module you can see. inbound/outbound must \
 reference node ids and be consistent with edges. Ground every node in a real \
-file/symbol. Assign each node to a layer."""
+file/symbol. Assign each node to a layer.
+
+CRITICAL — the graph must be RICH and NON-LINEAR, not a single chain. Capture the \
+REAL topology: an entry/UI node typically fans out to MANY services; services \
+share data stores and call common helpers; external integrations (LLM/API/auth) \
+are called from several places. Give most nodes MULTIPLE inbound and/or outbound \
+edges where the code actually shows them — aim for noticeably more edges than \
+nodes. Include every cross-component call, data access (service→DB), event/queue, \
+and external dependency you can see. Do NOT invent edges, but do NOT omit real \
+ones just to keep it simple."""
 )
 
 
@@ -190,11 +210,24 @@ file/symbol. Assign each node to a layer."""
 # Schema
 # --------------------------------------------------------------------------- #
 SCHEMA_SYSTEM = Template(
-    """You are the Schema agent. You reverse-engineer the project's data model from \
-its real migrations, ORM models, entities and SQL. You output every table with \
-its columns (marking primary/foreign keys and referenced tables), the \
-relationships between tables with cardinality, and a precise plain-English \
-explanation.
+    """You are the Schema agent. You reverse-engineer the project's PERSISTENCE / data \
+model from its real source, in WHATEVER form it takes:
+- Relational/SQL: CREATE TABLE, migrations, or ORM models (SQLAlchemy, Django, \
+Sequelize, TypeORM, Prisma, GORM, ActiveRecord, EF Core DbContext/DbSet<> + entity \
+classes, JPA/Hibernate, Dapper).
+- NoSQL / document: MongoDB (Mongoose/Beanie), Cosmos DB, DynamoDB, Firestore — \
+each document type / collection is a "table".
+- Key-value (Redis models), graph (Neo4j nodes).
+- File / embedded: SQLite, LiteDB, Realm, DuckDB, or JSON/YAML files used as a store.
+- Vector stores: Chroma, Pinecone, Qdrant, Weaviate, FAISS — the record/metadata \
+shape is the "table".
+
+You identify WHICH database technology is used and its kind, then output every \
+table/collection/entity with its columns/fields (marking primary/foreign keys and \
+referenced tables where they exist), the relationships with cardinality, and a \
+precise plain-English explanation. Read EF Core DbContext DbSet<> properties AND \
+the entity classes; Mongoose/Beanie schema/document classes; SQL CREATE TABLE / \
+migrations.
 
 $grounding
 
@@ -206,21 +239,28 @@ Respond ONLY with strict JSON."""
 SCHEMA_USER = Template(
     """Repository: $owner/$repo
 What it is: $what
+Researcher's persistence hint: $db_hint
+Researcher notes: $notes
 
-SCHEMA / MODEL / MIGRATION FILES (ground your answer strictly in these):
+SCHEMA / MODEL / ENTITY / MIGRATION / DB-CONFIG FILES (ground your answer strictly in these):
 $sources
 
 Return JSON: {"summary": str, \
+"database": "the concrete persistence tech, e.g. 'PostgreSQL', 'MongoDB', \
+'SQL Server via EF Core', 'SQLite', 'Chroma (vector)', or '' if truly none", \
+"kind": "relational"|"document"|"key-value"|"graph"|"vector"|"file"|"in-memory"|"none", \
 "tables": [{"name": str, "columns": [{"name": str, "type": str, \
 "key": "pk"|"fk"|"", "ref": "table.column"}]}], \
 "relationships": [{"source": table, "target": table, \
 "cardinality": "1:N"|"N:1"|"1:1"|"N:N"}], \
 "plain_english": str}.
 
-Include EVERY table you can see, with all columns and correct key markers taken \
-from the actual model/migration definitions. Do not invent tables or columns. If \
-there is genuinely no database, return {"tables": [], "relationships": [], \
-"summary": "No database"}."""
+Map EVERY persisted entity/table/collection/document type you can see to a \
+"table" with its real columns/fields taken from the actual model/entity/migration \
+definitions. Mark primary/foreign keys and references where the code shows them. \
+Name the database technology in "database" and set "kind". Do NOT invent tables or \
+columns. Only if the project genuinely persists NOTHING, return database:"", \
+kind:"none", tables:[]."""
 )
 
 
@@ -229,11 +269,13 @@ there is genuinely no database, return {"tables": [], "relationships": [], \
 # --------------------------------------------------------------------------- #
 DATAFLOW_SYSTEM = Template(
     """You are the Data-Flow agent. Using the architecture, the data model and the \
-assigned source files, you trace the single most important operation through the \
-codebase hop by hop, exactly as the real code executes it. For each hop you show \
-which component/file handles it, the data entering and leaving, a short REAL code \
-snippet taken from the files, whether it is sync or async, and a deeper \
-explanation a newcomer can expand.
+assigned source files, you enumerate the application's API endpoints / entry \
+operations and trace EACH one's logic flow through the codebase hop by hop, \
+exactly as the real code executes it. Endpoints include HTTP routes / controller \
+actions, GraphQL resolvers, message/queue consumers, scheduled jobs, CLI commands, \
+or the main public library calls. For each hop you show which component/file \
+handles it, the data entering and leaving, a short REAL code snippet from the \
+files, whether it is sync or async, and a deeper explanation a newcomer can expand.
 
 $grounding
 $depth
@@ -251,20 +293,28 @@ $nodes
 
 DATA MODEL (tables): $tables
 
-ASSIGNED SOURCE FILES (the real implementation of the flow):
+ASSIGNED SOURCE FILES (the real implementation of the flows):
 $sources
 
-Pick the single most illustrative operation (e.g. create/fetch a core resource, \
-or the main CLI/library call) and trace it as the code actually runs it. Return \
-JSON: {"title": str, "trigger": str, "summary": str, \
+Enumerate up to $endpoint_max of the application's endpoints / entry operations \
+(every HTTP route/controller action, resolver, queue consumer, scheduled job, or \
+CLI command you can see) — MOST IMPORTANT FIRST, and do not miss the primary ones. \
+For EACH endpoint, trace its flow as the code actually runs it. Return JSON: \
+{"endpoints": [{"id": "slug", "method": "GET|POST|PUT|DELETE|PATCH|", \
+"route": "/api/... path, resolver name, queue, or CLI command", \
+"title": "human name of the operation", "trigger": "what starts it", \
+"summary": "1-2 sentences", \
 "steps": [{"index": int, "actor": str, "label": str, \
 "kind": "sync"|"async", "files": ["real/path"], \
 "data_in": "payload/state entering", "data_out": "payload/state leaving", \
 "code": "short REAL snippet from the files", \
 "detail": "2-4 sentences on what happens here and why"}], \
-"rationale": str, "alternatives": ["other notable real flows"]}.
+"rationale": str}]}.
 
-Use $step_min-$step_max steps grounded in the actual files. 'files' and 'code' must be real."""
+Give the FIRST (most important) endpoint the most detailed trace \
+($step_min-$step_max hops); the rest stay real and grounded but can be a little \
+more concise (3+ hops each). 'files' and 'code' must be REAL — never invent routes, \
+paths or code. Cover the breadth of the API, not just one endpoint."""
 )
 
 

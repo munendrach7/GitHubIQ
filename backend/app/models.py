@@ -156,6 +156,18 @@ class FlowStep(BaseModel):
     data_out: str = ""               # payload/state leaving this step
 
 
+class EndpointFlow(BaseModel):
+    """The logic flow of a single API endpoint / entry operation."""
+    id: str
+    method: str = ""                  # GET/POST/PUT/DELETE/... or "" for non-HTTP
+    route: str = ""                   # /api/... path, resolver, queue, or CLI command
+    title: str = ""
+    trigger: str = ""
+    summary: str = ""
+    steps: list[FlowStep] = Field(default_factory=list)
+    rationale: str = ""
+
+
 class DataFlow(BaseModel):
     title: str = ""
     trigger: str = ""                 # what starts this flow
@@ -163,6 +175,9 @@ class DataFlow(BaseModel):
     steps: list[FlowStep] = Field(default_factory=list)
     rationale: str = ""
     alternatives: list[str] = Field(default_factory=list)  # other notable flows
+    # One traced flow per API endpoint / entry operation (the top-level fields
+    # above mirror the first/most-important endpoint for backward compatibility).
+    endpoints: list[EndpointFlow] = Field(default_factory=list)
 
 
 class Column(BaseModel):
@@ -185,6 +200,8 @@ class Relationship(BaseModel):
 
 class Schema(BaseModel):
     summary: str = ""
+    database: str = ""            # detected persistence tech, e.g. "PostgreSQL", "MongoDB", "SQLite via EF Core"
+    kind: str = ""                # relational | document | key-value | graph | vector | file | in-memory | none
     tables: list[Table] = Field(default_factory=list)
     relationships: list[Relationship] = Field(default_factory=list)
     plain_english: str = ""
@@ -269,6 +286,7 @@ class ResearchBrief(BaseModel):
     languages: list[str] = Field(default_factory=list)
     components: list[Component] = Field(default_factory=list)
     has_database: bool = False
+    database: str = ""             # the persistence technology in use, if any
     notes: str = ""
     # curated file paths each specialist agent should read (agent name -> paths)
     file_assignments: dict[str, list[str]] = Field(default_factory=dict)

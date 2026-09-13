@@ -63,6 +63,17 @@ export interface FlowStep {
   data_out: string;
 }
 
+export interface EndpointFlow {
+  id: string;
+  method: string;
+  route: string;
+  title: string;
+  trigger: string;
+  summary: string;
+  steps: FlowStep[];
+  rationale: string;
+}
+
 export interface DataFlow {
   title: string;
   trigger: string;
@@ -70,6 +81,7 @@ export interface DataFlow {
   steps: FlowStep[];
   rationale: string;
   alternatives: string[];
+  endpoints?: EndpointFlow[];
 }
 
 export interface Column {
@@ -92,6 +104,8 @@ export interface Relationship {
 
 export interface Schema {
   summary: string;
+  database?: string;
+  kind?: string;
   tables: Table[];
   relationships: Relationship[];
   plain_english: string;

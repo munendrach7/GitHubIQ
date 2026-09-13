@@ -37,8 +37,14 @@ ENTRY_HINTS = re.compile(
 )
 
 DB_HINTS = re.compile(
-    r"(migration|schema\.|models?\.|entity|\.sql|prisma|alembic|sequelize|"
-    r"typeorm|sqlmodel|sqlalchemy|gorm|ecto|activerecord)",
+    r"(migration|schema[\._]|models?[\._/]|entit(y|ies)|repositor(y|ies)|\.sql\b|"
+    r"prisma|alembic|sequelize|typeorm|mikro-?orm|sqlmodel|sqlalchemy|gorm|ecto|"
+    r"activerecord|dapper|hibernate|\bjpa\b|mongoose|beanie|peewee|\bpony\b|knex|"
+    r"drizzle|dbcontext|dbset|efcore|entityframework|appsettings|connectionstring|"
+    r"mongo|cosmos|dynamo|firestore|firebase|\bredis\b|cassandra|couch|neo4j|"
+    r"sqlite|litedb|realm|\.db\b|\.sqlite\b|duckdb|"
+    r"chroma|pinecone|qdrant|weaviate|milvus|faiss|vector[\s_-]?store|embeddings?|"
+    r"\bdao\b|persistence|datastore|data[-_]?context)",
     re.IGNORECASE,
 )
 
@@ -99,6 +105,7 @@ def _heuristic(ctx) -> ResearchBrief:
         languages=ctx.meta.languages,
         components=components,
         has_database=has_db,
+        database="",
         file_assignments={s: interesting for s in SPECIALISTS},
     )
 
@@ -183,6 +190,7 @@ def run(state: GraphState) -> dict:
                 languages=data.get("languages") or ctx.meta.languages,
                 components=[Component.model_validate(c) for c in data["components"]],
                 has_database=bool(data.get("has_database", fallback.has_database)),
+                database=data.get("database", "") or fallback.database,
                 notes=data.get("notes", ""),
                 file_assignments=data.get("file_assignments") or fallback.file_assignments,
             )

@@ -30,7 +30,7 @@ variable "openai_model_version" {
 
 variable "openai_capacity" {
   type        = number
-  default     = 30
+  default     = 500
   description = "GlobalStandard capacity (TPM in thousands) for the model deployment."
 }
 

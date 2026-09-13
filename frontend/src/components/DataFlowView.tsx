@@ -1,32 +1,79 @@
-import { useState } from "react";
-import type { DataFlow } from "../types";
+import { useMemo, useState } from "react";
+import type { DataFlow, EndpointFlow } from "../types";
+
+const METHOD_COLOR: Record<string, string> = {
+  GET: "green", POST: "blue", PUT: "orange", PATCH: "orange", DELETE: "pink",
+};
 
 export default function DataFlowView({ flow }: { flow: DataFlow }) {
+  // Prefer the per-endpoint flows; fall back to the single legacy flow.
+  const endpoints: EndpointFlow[] = useMemo(() => {
+    if (flow.endpoints && flow.endpoints.length) return flow.endpoints;
+    return [
+      {
+        id: "main", method: "", route: "", title: flow.title,
+        trigger: flow.trigger, summary: flow.summary, steps: flow.steps,
+        rationale: flow.rationale,
+      },
+    ];
+  }, [flow]);
+
+  const [activeEp, setActiveEp] = useState(0);
   const [active, setActive] = useState(0);
-  if (!flow.steps.length) {
+  const ep = endpoints[Math.min(activeEp, endpoints.length - 1)];
+
+  if (!ep || !ep.steps.length) {
     return <div className="glass empty">No data flow was traced for this repository.</div>;
   }
-  const step = flow.steps[Math.min(active, flow.steps.length - 1)];
+
+  const step = ep.steps[Math.min(active, ep.steps.length - 1)];
   const atStart = active <= 0;
-  const atEnd = active >= flow.steps.length - 1;
+  const atEnd = active >= ep.steps.length - 1;
+  const selectEp = (i: number) => { setActiveEp(i); setActive(0); };
 
   return (
     <div>
       <div className="page-head" style={{ paddingTop: 0 }}>
-        <h2 style={{ fontSize: 24 }}>🐬 {flow.title}</h2>
-        {flow.trigger && (
-          <p className="muted"><span className="tag orange">trigger</span> {flow.trigger}</p>
-        )}
-        <p>{flow.summary}</p>
-        <p className="dim" style={{ fontSize: 13, marginTop: 4 }}>
-          Pick a step on the left — or press Next — to walk the request through the system.
+        <h2 style={{ fontSize: 24 }}>🐬 Application flows</h2>
+        <p>
+          {endpoints.length} endpoint{endpoints.length === 1 ? "" : "s"} traced — pick one
+          to walk its logic end to end.
         </p>
       </div>
 
+      {endpoints.length > 1 && (
+        <div className="flow-endpoint-tabs">
+          {endpoints.map((e, i) => (
+            <button
+              key={e.id || i}
+              className={`endpoint-tab ${i === activeEp ? "on" : ""}`}
+              onClick={() => selectEp(i)}
+              title={e.title}
+            >
+              {e.method && <span className={`tag ${METHOD_COLOR[e.method] || "blue"} mono`}>{e.method}</span>}
+              <span className="mono endpoint-tab-route">{e.route || e.title}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div className="page-head" style={{ paddingTop: 0 }}>
+        <h3 style={{ fontSize: 19, margin: 0, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          {ep.method && <span className={`tag ${METHOD_COLOR[ep.method] || "blue"} mono`}>{ep.method}</span>}
+          <span className="mono">{ep.route || ep.title}</span>
+        </h3>
+        {ep.route && ep.title && ep.title !== ep.route && (
+          <p className="dim" style={{ marginTop: 4 }}>{ep.title}</p>
+        )}
+        {ep.trigger && (
+          <p className="muted" style={{ marginTop: 6 }}><span className="tag orange">trigger</span> {ep.trigger}</p>
+        )}
+        {ep.summary && <p>{ep.summary}</p>}
+      </div>
+
       <div className="flow-layout">
-        {/* Vertical step rail */}
         <div className="flow-rail-v">
-          {flow.steps.map((s, i) => (
+          {ep.steps.map((s, i) => (
             <button
               key={s.index}
               className={`rail-node-v ${i === active ? "on" : ""} ${i < active ? "done" : ""}`}
@@ -42,8 +89,7 @@ export default function DataFlowView({ flow }: { flow: DataFlow }) {
         </div>
 
         <div className="flow-main">
-          {/* Active step detail */}
-          <div className="glass card flow-active" key={step.index}>
+          <div className="glass card flow-active" key={`${ep.id}-${step.index}`}>
             <div className="flow-active-head">
               <span className={`flow-idx ${step.kind}`}>{step.index}</span>
               <div>
@@ -80,29 +126,19 @@ export default function DataFlowView({ flow }: { flow: DataFlow }) {
 
             <div className="flow-nav">
               <button className="btn ghost" disabled={atStart} onClick={() => setActive(active - 1)}>← Previous</button>
-              <span className="dim">{active + 1} of {flow.steps.length}</span>
+              <span className="dim">{active + 1} of {ep.steps.length}</span>
               <button className="btn accent" disabled={atEnd} onClick={() => setActive(active + 1)}>Next step →</button>
             </div>
           </div>
 
-          <div className="grid-2" style={{ marginTop: 16 }}>
-            {flow.rationale && (
+          {ep.rationale && (
+            <div className="grid-2" style={{ marginTop: 16 }}>
               <div className="glass card">
                 <h4>🧠 Why it's built this way</h4>
-                <p>{flow.rationale}</p>
+                <p>{ep.rationale}</p>
               </div>
-            )}
-            {(flow.alternatives || []).length > 0 && (
-              <div className="glass card">
-                <h4>🔀 Other notable flows</h4>
-                <ul style={{ margin: "8px 0 0 18px" }}>
-                  {flow.alternatives.map((a) => (
-                    <li key={a} style={{ margin: "4px 0", color: "var(--muted)" }}>{a}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

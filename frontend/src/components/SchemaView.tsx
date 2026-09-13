@@ -142,7 +142,7 @@ export default function SchemaView({ schema }: { schema: Schema }) {
   if (!tables.length) {
     return (
       <div className="glass card">
-        <h4>🗄️ Database schema</h4>
+        <h4>🗄️ Database schema {schema.database && <span className="tag purple">{schema.database}</span>}</h4>
         <p>{schema.summary || "This project has no relational database."}</p>
         {schema.plain_english && <p style={{ marginTop: 10 }}>{schema.plain_english}</p>}
       </div>
@@ -154,7 +154,14 @@ export default function SchemaView({ schema }: { schema: Schema }) {
       <div>
         <div className="canvas-frame glass" ref={vp.frameRef}>
           <div className="canvas-toolbar">
-            <span className="dim" style={{ fontSize: 12.5 }}>🖐️ Drag to pan · scroll to zoom · drag a table to move it</span>
+            <span className="dim" style={{ fontSize: 12.5 }}>
+              {schema.database && (
+                <span className="tag purple" style={{ marginRight: 8 }}>
+                  {schema.database}{schema.kind ? ` · ${schema.kind}` : ""}
+                </span>
+              )}
+              🖐️ Drag to pan · scroll to zoom · drag a table to move it
+            </span>
             <div className="canvas-tools">
               <button className="icon-btn sm" title="Zoom out" onClick={vp.zoomOut}>−</button>
               <span className="zoom-label">{Math.round(vp.zoom * 100)}%</span>

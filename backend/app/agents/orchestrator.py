@@ -62,7 +62,7 @@ def _compose(state: GraphState) -> dict:
         )
     if brief.entry_points:
         facts.append("- **Entry points:** " + ", ".join(f"`{e}`" for e in brief.entry_points[:6]))
-    facts.append(f"- **Database:** {'yes' if brief.has_database else 'none detected'}")
+    facts.append(f"- **Database:** {brief.database or ('yes' if brief.has_database else 'none detected')}")
     if ctx.meta.file_count:
         facts.append(f"- **Files analysed:** {ctx.meta.file_count}")
 
@@ -183,7 +183,12 @@ def _compose(state: GraphState) -> dict:
                 section="Follow the data",
                 icon="🗄️",
                 summary=sch.summary,
-                body=sch.plain_english,
+                body=(
+                    (f"**Database:** {sch.database}" + (f" ({sch.kind})" if sch.kind else "") + "\n\n")
+                    if sch.database
+                    else ""
+                )
+                + sch.plain_english,
                 tags=["schema"],
             )
         )
