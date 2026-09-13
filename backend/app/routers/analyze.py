@@ -12,6 +12,7 @@ from ..auth import get_current_user, rate_status, record_generation
 from ..github_client import GitHubClient, parse_repo_url
 from ..messaging import enqueue_analysis, servicebus_enabled
 from ..models import (
+    AdminUserView,
     AgentProgress,
     AnalysisResult,
     AnalysisStatus,
@@ -150,3 +151,44 @@ def get_analysis(analysis_id: str) -> AnalysisResult:
     if result is None:
         raise HTTPException(status_code=404, detail="Analysis not found")
     return result
+
+
+@router.get("/admin/users", response_model=list[AdminUserView])
+def admin_list_users(user: User = Depends(get_current_user)) -> list[AdminUserView]:
+    """Admin-only: every user in the system and the guides they've generated."""
+    if not user.is_admin:
+        raise HTTPException(status_code=403, detail="Admins only")
+    store = get_store()
+    by_owner: dict[str, list[AnalysisSummary]] = {}
+    for r in store.list_all_analyses():
+        by_owner.setdefault(r.owner, []).append(
+            AnalysisSummary(
+                id=r.id,
+                repo_url=r.repo_url,
+                repo_name=r.repo.name,
+                repo_owner=r.repo.owner,
+                owner=r.owner,
+                status=r.status,
+                percent=r.percent,
+                created_at=r.created_at,
+                llm_powered=r.llm_powered,
+            )
+        )
+    views = [
+        AdminUserView(
+            username=u.username,
+            created_at=u.created_at,
+            is_admin=u.is_admin,
+            generations=len(u.generations),
+            guides=by_owner.pop(u.username, []),
+        )
+        for u in store.list_users()
+    ]
+    # Include any owners that have guides but no stored user record (e.g. admin).
+    for owner, guides in by_owner.items():
+        if owner:
+            views.append(
+                AdminUserView(username=owner, generations=len(guides), guides=guides)
+            )
+    views.sort(key=lambda v: (len(v.guides), v.created_at), reverse=True)
+    return views

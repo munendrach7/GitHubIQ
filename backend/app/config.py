@@ -83,6 +83,9 @@ class Settings(BaseSettings):
     # intents older than ``cleanup_after_hours``, running every interval.
     cleanup_after_hours: float = 48.0
     janitor_interval_minutes: float = 60.0
+    # How often a running job re-reads its cancel-intent record from the store.
+    # Higher = fewer Cosmos reads, but a cancel takes longer to take effect.
+    cancel_poll_seconds: float = 30.0
 
     @property
     def admin_password_hash(self) -> str:

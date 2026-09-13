@@ -339,3 +339,12 @@ class AnalysisSummary(BaseModel):
     percent: int = 0
     created_at: float = 0.0
     llm_powered: bool = False
+
+
+class AdminUserView(BaseModel):
+    """A user plus their generated guides, for the admin users dashboard."""
+    username: str
+    created_at: float = 0.0
+    is_admin: bool = False
+    generations: int = 0
+    guides: list[AnalysisSummary] = Field(default_factory=list)

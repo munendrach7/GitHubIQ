@@ -1,4 +1,4 @@
-import type { AnalysisResult, AnalysisSummary, AuthUser, Preferences, RateStatus } from "./types";
+import type { AdminUserView, AnalysisResult, AnalysisSummary, AuthUser, Preferences, RateStatus } from "./types";
 
 const BASE = import.meta.env.VITE_API_BASE || "";
 
@@ -112,6 +112,12 @@ export async function cancelAnalysis(id: string): Promise<AnalysisResult> {
 
 export async function listAnalyses(): Promise<AnalysisSummary[]> {
   const res = await fetch(`${BASE}/api/analyses`, { headers: authHeaders() });
+  if (!res.ok) throw await parseError(res);
+  return res.json();
+}
+
+export async function listAdminUsers(): Promise<AdminUserView[]> {
+  const res = await fetch(`${BASE}/api/admin/users`, { headers: authHeaders() });
   if (!res.ok) throw await parseError(res);
   return res.json();
 }

@@ -225,6 +225,12 @@ resource "azurerm_container_app" "backend" {
     identity = azurerm_user_assigned_identity.app.id
   }
 
+  # Azure Speech (TTS) key for video narration, from the multi-service AIServices account.
+  secret {
+    name  = "speech-key"
+    value = azurerm_cognitive_account.aoai.primary_access_key
+  }
+
   ingress {
     external_enabled = true
     target_port      = 8000
@@ -257,6 +263,16 @@ resource "azurerm_container_app" "backend" {
       env {
         name  = "CORS_ORIGINS"
         value = "*"
+      }
+
+      env {
+        name        = "SPEECH_KEY"
+        secret_name = "speech-key"
+      }
+
+      env {
+        name  = "SPEECH_REGION"
+        value = data.azurerm_resource_group.rg.location
       }
     }
   }

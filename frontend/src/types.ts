@@ -219,6 +219,14 @@ export interface AnalysisSummary {
   llm_powered: boolean;
 }
 
+export interface AdminUserView {
+  username: string;
+  created_at: number;
+  is_admin: boolean;
+  generations: number;
+  guides: AnalysisSummary[];
+}
+
 export interface AnalysisResult {
   id: string;
   repo_url: string;

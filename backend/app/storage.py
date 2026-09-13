@@ -36,6 +36,9 @@ class Store:
     def list_all_analyses(self) -> list[AnalysisResult]:  # pragma: no cover
         raise NotImplementedError
 
+    def list_users(self) -> list[User]:  # pragma: no cover
+        raise NotImplementedError
+
     # --- Cancellation intents (separate from the analysis doc so a worker's
     # progress writes can never clobber a user's cancel request) ---
     def request_cancel(self, analysis_id: str) -> None:  # pragma: no cover
@@ -85,6 +88,11 @@ class MemoryStore(Store):
             docs = list(self._data.values())
         results = [AnalysisResult.model_validate(d) for d in docs]
         return sorted(results, key=lambda r: r.created_at, reverse=True)
+
+    def list_users(self) -> list[User]:
+        with self._lock:
+            docs = list(self._users.values())
+        return [User.model_validate(d) for d in docs]
 
     def request_cancel(self, analysis_id: str) -> None:
         with self._lock:
@@ -185,6 +193,18 @@ class CosmosStore(Store):
             except Exception:  # noqa: BLE001
                 continue
         return sorted(results, key=lambda r: r.created_at, reverse=True)
+
+    def list_users(self) -> list[User]:
+        items = self._users.query_items(
+            query="SELECT * FROM c", enable_cross_partition_query=True
+        )
+        out: list[User] = []
+        for d in items:
+            try:
+                out.append(User.model_validate(d))
+            except Exception:  # noqa: BLE001
+                continue
+        return out
 
     def request_cancel(self, analysis_id: str) -> None:
         self._container.upsert_item(

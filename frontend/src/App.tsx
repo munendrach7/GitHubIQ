@@ -5,6 +5,7 @@ import Analysis from "./pages/Analysis";
 import Guide from "./pages/Guide";
 import Login from "./pages/Login";
 import History from "./pages/History";
+import Admin from "./pages/Admin";
 import { useAuth } from "./AuthContext";
 import type { ReactElement } from "react";
 
@@ -25,6 +26,7 @@ export default function App() {
           <Route path="/" element={<Landing />} />
           <Route path="/login" element={<Login />} />
           <Route path="/history" element={<RequireAuth><History /></RequireAuth>} />
+          <Route path="/admin" element={<RequireAuth><Admin /></RequireAuth>} />
           <Route path="/tailor" element={<RequireAuth><Questionnaire /></RequireAuth>} />
           <Route path="/analysis/:id" element={<RequireAuth><Analysis /></RequireAuth>} />
           <Route path="/guide/:id" element={<RequireAuth><Guide /></RequireAuth>} />

@@ -5,6 +5,7 @@ import threading
 import time
 from typing import Any, Callable, Optional, TypedDict
 
+from ..config import get_settings
 from ..models import (
     AnalysisResult,
     AnalysisStatus,
@@ -62,7 +63,8 @@ class ProgressReporter:
         self._cancel_check = cancel_check
         self._cancel_latched = False
         self._last_poll = 0.0
-        self._poll_interval = 1.0  # seconds between external cancel-flag reads
+        # Seconds between external cancel-flag reads (configurable via settings).
+        self._poll_interval = get_settings().cancel_poll_seconds
 
     @property
     def result(self) -> AnalysisResult:
