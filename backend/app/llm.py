@@ -28,7 +28,7 @@ def get_llm():
     A new client per call avoids any shared-state races when the specialist
     agents invoke the model concurrently (LangGraph fan-out).
     """
-    return _build_llm(json_mode=True, max_tokens=32000, temperature=0.2)
+    return _build_llm(json_mode=True, max_tokens=32000, temperature=0.2, max_retries=2)
 
 
 def _build_llm(
@@ -37,12 +37,16 @@ def _build_llm(
     json_mode: bool = True,
     max_tokens: int = 32000,
     temperature: float = 0.2,
+    timeout: int = 180,
+    max_retries: int = 2,
 ):
     """Construct an AzureChatOpenAI client for a given deployment, or ``None``.
 
     ``deployment`` defaults to the main reasoning model. Pass the mini deployment
     (see :func:`get_compaction_llm`) for cheap, low-reasoning work. ``json_mode``
     forces a JSON object response; disable it for free-form text (summaries).
+    ``timeout``/``max_retries`` are kept modest so a slow or flaky call fails
+    fast rather than stalling a whole agent (and the pipeline) for minutes.
     """
     settings = get_settings()
     if not settings.llm_configured:
@@ -53,14 +57,20 @@ def _build_llm(
 
     kwargs: dict[str, Any] = dict(
         azure_endpoint=settings.azure_openai_endpoint,
-        api_key=settings.azure_openai_api_key,
         api_version=settings.azure_openai_api_version,
         azure_deployment=deployment or settings.azure_openai_deployment,
         temperature=temperature,
         max_tokens=max_tokens,
-        timeout=180,
-        max_retries=3,
+        timeout=timeout,
+        max_retries=max_retries,
     )
+    if settings.azure_openai_api_key:
+        kwargs["api_key"] = settings.azure_openai_api_key
+    else:
+        # No key → authenticate with the managed identity (Entra token).
+        from .azure_ident import COGNITIVE_SCOPE, get_token_provider
+
+        kwargs["azure_ad_token_provider"] = get_token_provider(COGNITIVE_SCOPE)
     if json_mode:
         # Force valid JSON so richer prompts never break parsing.
         kwargs["model_kwargs"] = {"response_format": {"type": "json_object"}}
@@ -68,12 +78,19 @@ def _build_llm(
 
 
 def get_compaction_llm(max_tokens: int = 2000):
-    """Cheap/fast model client for compaction & other low-reasoning adhoc tasks."""
+    """Cheap/fast model client for compaction & other low-reasoning adhoc tasks.
+
+    Fail-fast settings (short timeout, single retry): compaction runs many small
+    calls, so a stuck one must not hold up the agent — a miss just falls back to
+    a structural excerpt.
+    """
     return _build_llm(
         deployment=get_settings().mini_deployment,
         json_mode=False,
         max_tokens=max_tokens,
         temperature=0.1,
+        timeout=60,
+        max_retries=1,
     )
 
 

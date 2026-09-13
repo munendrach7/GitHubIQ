@@ -101,6 +101,15 @@ export async function getAnalysis(id: string): Promise<AnalysisResult> {
   return res.json();
 }
 
+export async function cancelAnalysis(id: string): Promise<AnalysisResult> {
+  const res = await fetch(`${BASE}/api/analysis/${id}/cancel`, {
+    method: "POST",
+    headers: authHeaders(),
+  });
+  if (!res.ok) throw await parseError(res);
+  return res.json();
+}
+
 export async function listAnalyses(): Promise<AnalysisSummary[]> {
   const res = await fetch(`${BASE}/api/analyses`, { headers: authHeaders() });
   if (!res.ok) throw await parseError(res);

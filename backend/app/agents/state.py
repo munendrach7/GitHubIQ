@@ -2,7 +2,8 @@
 from __future__ import annotations
 
 import threading
-from typing import Any, Optional, TypedDict
+import time
+from typing import Any, Callable, Optional, TypedDict
 
 from ..models import (
     AnalysisResult,
@@ -16,6 +17,16 @@ from ..models import (
     VideoExplainer,
 )
 from ..storage import Store
+
+
+class PipelineCancelled(Exception):
+    """Raised to abort the agent pipeline when the user cancels a run."""
+
+
+def check_cancelled(reporter: "ProgressReporter | None") -> None:
+    """Raise :class:`PipelineCancelled` if the run has been cancelled."""
+    if reporter is not None and reporter.cancelled():
+        raise PipelineCancelled()
 
 
 class ProgressReporter:
@@ -35,14 +46,50 @@ class ProgressReporter:
         "Presenter": 12,
     }
 
-    def __init__(self, result: AnalysisResult, store: Store) -> None:
+    def __init__(
+        self,
+        result: AnalysisResult,
+        store: Store,
+        cancel_event: "threading.Event | None" = None,
+        cancel_check: "Callable[[], bool] | None" = None,
+    ) -> None:
         self._result = result
         self._store = store
         self._lock = threading.Lock()
+        self._cancel = cancel_event
+        # Optional external check (e.g. re-read a persisted cancel flag) so a run
+        # executing in a worker process still sees a cancel issued via the API.
+        self._cancel_check = cancel_check
+        self._cancel_latched = False
+        self._last_poll = 0.0
+        self._poll_interval = 2.0  # seconds between external cancel-flag reads
 
     @property
     def result(self) -> AnalysisResult:
         return self._result
+
+    def cancelled(self) -> bool:
+        """True once a cancellation has been requested for this run.
+
+        Checks the in-process event first (cheap), then, at most every
+        ``_poll_interval`` seconds, an optional external flag (e.g. the persisted
+        ``cancel_requested``). The result latches so we never flip back.
+        """
+        if self._cancel_latched:
+            return True
+        if self._cancel is not None and self._cancel.is_set():
+            self._cancel_latched = True
+            return True
+        if self._cancel_check is not None:
+            now = time.monotonic()
+            if now - self._last_poll >= self._poll_interval:
+                self._last_poll = now
+                try:
+                    if self._cancel_check():
+                        self._cancel_latched = True
+                except Exception:  # noqa: BLE001 - never let a poll break the run
+                    pass
+        return self._cancel_latched
 
     def _find(self, name: str):
         for p in self._result.progress:
@@ -75,6 +122,16 @@ class ProgressReporter:
         with self._lock:
             self._result.status = AnalysisStatus.error
             self._result.error = message
+            self._store.upsert(self._result)
+
+    def cancel(self, message: str = "Cancelled by user.") -> None:
+        with self._lock:
+            self._result.status = AnalysisStatus.cancelled
+            self._result.error = message
+            for p in self._result.progress:
+                if p.status in ("waiting", "running"):
+                    p.status = "error"
+                    p.detail = p.detail or "Cancelled"
             self._store.upsert(self._result)
 
 

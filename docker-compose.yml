@@ -4,13 +4,19 @@ services:
     container_name: githubiq-backend
     ports:
       - "8000:8000"
-    environment:
+    environment: &backend_env
       ENVIRONMENT: ${ENVIRONMENT:-development}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8080,http://localhost:5173}
+      USE_MANAGED_IDENTITY: ${USE_MANAGED_IDENTITY:-true}
+      AZURE_CLIENT_ID: ${AZURE_CLIENT_ID:-}
+      SERVICEBUS_NAMESPACE: ${SERVICEBUS_NAMESPACE:-}
+      SERVICEBUS_CONNECTION_STRING: ${SERVICEBUS_CONNECTION_STRING:-}
+      SERVICEBUS_QUEUE: ${SERVICEBUS_QUEUE:-analysis-jobs}
       AZURE_OPENAI_ENDPOINT: ${AZURE_OPENAI_ENDPOINT:-}
       AZURE_OPENAI_API_KEY: ${AZURE_OPENAI_API_KEY:-}
       AZURE_OPENAI_API_VERSION: ${AZURE_OPENAI_API_VERSION:-2024-10-21}
       AZURE_OPENAI_DEPLOYMENT: ${AZURE_OPENAI_DEPLOYMENT:-gpt-4o-mini}
+      AZURE_OPENAI_DEPLOYMENT_MINI: ${AZURE_OPENAI_DEPLOYMENT_MINI:-gpt-4o-mini}
       COSMOS_ENDPOINT: ${COSMOS_ENDPOINT:-}
       COSMOS_KEY: ${COSMOS_KEY:-}
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}
@@ -19,6 +25,18 @@ services:
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
       RATE_LIMIT_WINDOW_HOURS: ${RATE_LIMIT_WINDOW_HOURS:-4}
       RATE_LIMIT_MAX_ATTEMPTS: ${RATE_LIMIT_MAX_ATTEMPTS:-1}
+    restart: unless-stopped
+
+  # Async analysis worker(s). Consumes jobs from Service Bus and runs the agent
+  # pipeline. Scale horizontally with `docker compose up --scale worker=N`.
+  # Only useful when SERVICEBUS_* is configured; otherwise jobs run in-process
+  # inside the backend and this service simply idles/exits.
+  worker:
+    build: ./backend
+    command: ["python", "-m", "app.worker"]
+    environment: *backend_env
+    depends_on:
+      - backend
     restart: unless-stopped
 
   frontend:

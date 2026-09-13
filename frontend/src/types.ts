@@ -212,7 +212,8 @@ export interface AnalysisSummary {
   repo_url: string;
   repo_name: string;
   repo_owner: string;
-  status: "queued" | "running" | "done" | "error";
+  owner?: string;
+  status: "queued" | "running" | "done" | "error" | "cancelled";
   percent: number;
   created_at: number;
   llm_powered: boolean;
@@ -221,10 +222,11 @@ export interface AnalysisSummary {
 export interface AnalysisResult {
   id: string;
   repo_url: string;
-  status: "queued" | "running" | "done" | "error";
+  status: "queued" | "running" | "done" | "error" | "cancelled";
   progress: AgentProgress[];
   percent: number;
   error: string | null;
+  cancel_requested?: boolean;
   llm_powered: boolean;
   repo: RepoMeta;
   preferences: Preferences;

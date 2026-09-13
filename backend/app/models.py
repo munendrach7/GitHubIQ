@@ -286,6 +286,7 @@ class AnalysisStatus(str, Enum):
     running = "running"
     done = "done"
     error = "error"
+    cancelled = "cancelled"
 
 
 class AgentProgress(BaseModel):
@@ -305,6 +306,11 @@ class AnalysisResult(BaseModel):
     percent: int = 0
     error: Optional[str] = None
     llm_powered: bool = False
+    # Cooperative cancellation flag; a running worker polls this and aborts.
+    cancel_requested: bool = False
+    # Number of times a worker has picked up this job (fault-tolerance / poison
+    # detection across Service Bus redeliveries).
+    attempts: int = 0
 
     repo: RepoMeta = Field(default_factory=RepoMeta)
     preferences: Preferences = Field(default_factory=Preferences)
@@ -328,6 +334,7 @@ class AnalysisSummary(BaseModel):
     repo_url: str
     repo_name: str = ""
     repo_owner: str = ""
+    owner: str = ""              # app user who generated it (for admin views)
     status: AnalysisStatus = AnalysisStatus.queued
     percent: int = 0
     created_at: float = 0.0

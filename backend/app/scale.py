@@ -25,6 +25,7 @@ class OutputScale:
     lessons: tuple[int, int]      # tutor language/idiom lessons
     max_deepdives: int            # cap on per-component deep-dive sections
     deep_budget: int              # char budget for a component's source context
+    deepdive_deadline: int        # wall-clock seconds for the whole deep-dive phase
 
 
 # bucket -> (components, nodes, steps, lessons)
@@ -37,6 +38,10 @@ _BASE = {
 _LABELS = {0: "small", 1: "medium", 2: "large", 3: "very large"}
 _DEEP_BUDGET = {0: 60_000, 1: 90_000, 2: 120_000, 3: 150_000}
 _DEPTH_FACTOR = {"quick": 0.7, "guided": 1.0, "deep": 1.4}
+# The depth preference from the form governs how much work the Deep-Dive phase
+# does: how many components get an in-depth section, and how long it may run.
+_DEEPDIVE_CAP = {"quick": 5, "guided": 10, "deep": 18}
+_PHASE_DEADLINE = {"quick": 90, "guided": 180, "deep": 300}
 
 # Hard ceilings so a pathological repo can't explode cost/latency.
 _STEP_CAP = 16
@@ -79,6 +84,7 @@ def compute_scale(file_count: int, depth) -> OutputScale:
         nodes=node_r,
         steps=step_r,
         lessons=lesson_r,
-        max_deepdives=comp_r[1],
-        deep_budget=_DEEP_BUDGET[b],
+        max_deepdives=min(comp_r[1], _DEEPDIVE_CAP.get(depth_val, 10)),
+        deep_budget=min(180_000, round(_DEEP_BUDGET[b] * f)),
+        deepdive_deadline=_PHASE_DEADLINE.get(depth_val, 180),
     )

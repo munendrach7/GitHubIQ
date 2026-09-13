@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .config import get_settings
 from .llm import llm_available
+from .messaging import servicebus_enabled
 from .routers import analyze, auth, tts
 from .storage import get_store
 
@@ -38,6 +39,8 @@ def health() -> dict:
         "llm_configured": llm_available(),
         "speech_configured": settings.speech_configured,
         "store": type(get_store()).__name__,
+        "async_dispatch": servicebus_enabled(),
+        "managed_identity": settings.use_managed_identity,
     }
 
 

@@ -71,7 +71,24 @@ A working MVP that analyses **public** GitHub repositories end to end.
   stored only as a hash, never in source.
 - **Database** — Azure Cosmos DB (serverless) for guides and users; an in-memory
   store is used automatically for local dev.
-- **Containers** — a `Dockerfile` per service plus `docker-compose.yml`.
+- **Async execution** — the API enqueues each analysis on **Azure Service Bus**;
+  one or more **worker** processes (`python -m app.worker`) run the agent pipeline
+  off the request path. This is fault tolerant: message locks are auto-renewed
+  for long jobs, crashed jobs are redelivered, poisoned jobs are dead-lettered
+  after `JOB_MAX_ATTEMPTS`, and processing is idempotent. When Service Bus isn't
+  configured, jobs run in-process so local dev still works.
+- **Cancellation** — a run can be cancelled from the UI (or
+  `POST /api/analysis/{id}/cancel`); the pipeline checks a persisted flag at every
+  agent boundary and inside the Deep-Dive fan-out, so it stops promptly even when
+  a worker in another process is doing the work.
+- **Identity** — Azure OpenAI, Cosmos DB and Service Bus authenticate with a
+  **managed identity** (Microsoft Entra) when no key/connection string is set —
+  no secrets in the container. Set `AZURE_CLIENT_ID` for a user-assigned identity.
+- **Auth** — signup/login with signed tokens, an admin bypass and a configurable
+  per-user rate limit. **Admins** can see and open every user's guides; regular
+  users see only their own.
+- **Containers** — a `Dockerfile` per service plus `docker-compose.yml` (backend,
+  scalable `worker`, frontend).
 - **Cloud & CI/CD** — `infra/main.bicep` + `azure.yaml` for Azure Container Apps,
   and GitHub Actions workflows (`.github/workflows/`) that build images in ACR
   and deploy via OIDC (no secrets in the repo).

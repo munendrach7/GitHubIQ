@@ -7,9 +7,11 @@ import uuid
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 
+from .. import cancel as cancel_registry
 from ..agents.orchestrator import AGENT_NAMES, run_pipeline
 from ..auth import get_current_user, rate_status, record_generation
 from ..github_client import GitHubClient, parse_repo_url
+from ..messaging import enqueue_analysis, servicebus_enabled
 from ..models import (
     AgentProgress,
     AnalysisResult,
@@ -23,12 +25,17 @@ from ..storage import get_store
 logger = logging.getLogger("githubiq.api")
 router = APIRouter(prefix="/api", tags=["analysis"])
 
+# Terminal states in which a job can no longer be cancelled.
+_TERMINAL = {AnalysisStatus.done, AnalysisStatus.error, AnalysisStatus.cancelled}
+
 
 def _run_analysis(analysis_id: str, req: AnalyzeRequest) -> None:
+    """In-process execution path (used when Service Bus is not configured)."""
     store = get_store()
     result = store.get(analysis_id)
     if result is None:
         return
+    cancel_event = cancel_registry.register(analysis_id)
     try:
         owner, repo = parse_repo_url(req.repo_url)
         with GitHubClient() as gh:
@@ -39,7 +46,10 @@ def _run_analysis(analysis_id: str, req: AnalyzeRequest) -> None:
         result.error = f"Could not read repository: {exc}"
         store.upsert(result)
         return
-    run_pipeline(result, ctx, store)
+    try:
+        run_pipeline(result, ctx, store, cancel_event=cancel_event)
+    finally:
+        cancel_registry.clear(analysis_id)
 
 
 @router.post("/analyze", response_model=AnalysisResult, response_model_by_alias=True)
@@ -75,7 +85,39 @@ def analyze(
     store.upsert(result)
     # Record the generation up-front so concurrent requests can't bypass the limit.
     record_generation(store, user)
-    background.add_task(_run_analysis, analysis_id, req)
+
+    # Prefer async dispatch to a worker via Service Bus; fall back to running the
+    # job in-process so local dev / demos work without any broker configured.
+    if servicebus_enabled() and enqueue_analysis(analysis_id):
+        logger.info("Analysis %s dispatched to worker queue", analysis_id)
+    else:
+        background.add_task(_run_analysis, analysis_id, req)
+    return result
+
+
+@router.post("/analysis/{analysis_id}/cancel", response_model=AnalysisResult,
+             response_model_by_alias=True)
+def cancel_analysis(
+    analysis_id: str, user: User = Depends(get_current_user)
+) -> AnalysisResult:
+    store = get_store()
+    result = store.get(analysis_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    if not user.is_admin and result.owner != user.username:
+        raise HTTPException(status_code=403, detail="Not allowed to cancel this run")
+    if result.status in _TERMINAL:
+        return result  # already finished; nothing to cancel
+
+    # Persist the flag (a worker in another process polls it) AND signal any
+    # in-process run so it aborts promptly.
+    result.cancel_requested = True
+    if result.status == AnalysisStatus.queued:
+        # Not started yet — mark it cancelled right away for snappy feedback.
+        result.status = AnalysisStatus.cancelled
+        result.error = "Cancelled by user."
+    store.upsert(result)
+    cancel_registry.request_cancel(analysis_id)
     return result
 
 
@@ -93,13 +135,16 @@ def repo_tree(repo_url: str, _user: User = Depends(get_current_user)) -> dict:
 
 @router.get("/analyses", response_model=list[AnalysisSummary])
 def list_analyses(user: User = Depends(get_current_user)) -> list[AnalysisSummary]:
-    results = get_store().list_analyses(user.username)
+    store = get_store()
+    # Admins see every user's sessions; regular users see only their own.
+    results = store.list_all_analyses() if user.is_admin else store.list_analyses(user.username)
     return [
         AnalysisSummary(
             id=r.id,
             repo_url=r.repo_url,
             repo_name=r.repo.name,
             repo_owner=r.repo.owner,
+            owner=r.owner,
             status=r.status,
             percent=r.percent,
             created_at=r.created_at,

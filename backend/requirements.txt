@@ -10,4 +10,5 @@ langchain-core==0.3.29
 langchain-openai==0.2.14
 azure-cosmos==4.9.0
 azure-identity==1.19.0
+azure-servicebus==7.12.3
 tenacity==9.0.0

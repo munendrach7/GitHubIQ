@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import TopBar from "../components/TopBar";
-import { getAnalysis } from "../api";
+import { cancelAnalysis, getAnalysis } from "../api";
 import type { AnalysisResult } from "../types";
 
 const AGENT_META: Record<string, { icon: string; desc: string }> = {
@@ -20,6 +20,8 @@ export default function Analysis() {
   const nav = useNavigate();
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [error, setError] = useState("");
+  const [cancelled, setCancelled] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const timer = useRef<number>();
 
   useEffect(() => {
@@ -34,15 +36,41 @@ export default function Analysis() {
         } else if (r.status === "error") {
           window.clearInterval(timer.current);
           setError(r.error || "Analysis failed");
+        } else if (r.status === "cancelled") {
+          window.clearInterval(timer.current);
+          setCancelled(true);
         }
       } catch (e) {
         setError((e as Error).message);
       }
     };
     poll();
-    timer.current = window.setInterval(poll, 1200);
+    // Poll every 2.5s — the pipeline is long-running, so a slower cadence keeps
+    // the UI responsive without hammering the API.
+    timer.current = window.setInterval(poll, 2500);
     return () => window.clearInterval(timer.current);
   }, [id, nav]);
+
+  const doCancel = async () => {
+    if (!id) return;
+    setCancelling(true);
+    try {
+      const r = await cancelAnalysis(id);
+      setResult(r);
+      if (r.status === "cancelled") {
+        window.clearInterval(timer.current);
+        setCancelled(true);
+      }
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setCancelling(false);
+    }
+  };
+
+  const inProgress =
+    !!result && result.status !== "done" && result.status !== "error" &&
+    result.status !== "cancelled";
 
   const percent = result?.percent ?? 0;
   const circumference = 2 * Math.PI * 52;
@@ -52,8 +80,20 @@ export default function Analysis() {
       <TopBar
         sub={result?.repo?.name || "analyzing"}
         right={
-          <span className="pill">
-            <span className="dot b" /> {result?.status === "done" ? "Complete" : "Analyzing…"}
+          <span style={{ display: "inline-flex", gap: 10, alignItems: "center" }}>
+            <span className="pill">
+              <span className="dot b" /> {result?.status === "done" ? "Complete" : cancelled ? "Cancelled" : "Analyzing…"}
+            </span>
+            {inProgress && (
+              <button
+                className="btn ghost"
+                onClick={doCancel}
+                disabled={cancelling}
+                title="Cancel this analysis run"
+              >
+                {cancelling ? "Cancelling…" : "✕ Cancel"}
+              </button>
+            )}
           </span>
         }
       />
@@ -82,7 +122,17 @@ export default function Analysis() {
         </div>
       )}
 
-      {!error && (
+      {cancelled && !error && (
+        <div className="glass card" style={{ borderColor: "var(--orange, #e0a458)" }}>
+          <h4>🛑 Analysis cancelled</h4>
+          <p>This run was cancelled{result?.error ? `: ${result.error}` : "."}</p>
+          <button className="btn" style={{ marginTop: 14 }} onClick={() => nav("/")}>
+            ← Start a new analysis
+          </button>
+        </div>
+      )}
+
+      {!error && !cancelled && (
         <div className="analysis-grid" style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr", gap: 16 }}>
           <div className="glass">
             {result?.progress.map((p) => {

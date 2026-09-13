@@ -9,6 +9,12 @@ services:
     host: containerapp
     docker:
       path: ./Dockerfile
+  worker:
+    project: ./backend
+    language: python
+    host: containerapp
+    docker:
+      path: ./Dockerfile
   frontend:
     project: ./frontend
     language: js

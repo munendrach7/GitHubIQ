@@ -12,6 +12,22 @@ class Settings(BaseSettings):
     environment: str = "development"
     cors_origins: str = "*"
 
+    # Identity — prefer Microsoft Entra managed identity over secrets. When no
+    # key is provided for a service below, the app authenticates with the
+    # managed identity (DefaultAzureCredential / user-assigned via client id).
+    use_managed_identity: bool = True
+    azure_client_id: str = ""  # user-assigned managed identity client id (optional)
+
+    # Azure Service Bus — async job dispatch to worker(s). Leave both blank to
+    # run jobs in-process (FastAPI background task) for local dev / demos.
+    servicebus_namespace: str = ""          # e.g. myns.servicebus.windows.net (MI auth)
+    servicebus_connection_string: str = ""  # fallback for local dev (SAS auth)
+    servicebus_queue: str = "analysis-jobs"
+    # How long a worker keeps renewing a message lock while a job runs (seconds).
+    servicebus_max_lock_renewal: int = 3600
+    # Max delivery attempts before a poisoned job is dead-lettered.
+    job_max_attempts: int = 3
+
     # Azure OpenAI (from Azure AI Foundry)
     azure_openai_endpoint: str = ""
     azure_openai_api_key: str = ""
@@ -73,7 +89,20 @@ class Settings(BaseSettings):
 
     @property
     def llm_configured(self) -> bool:
-        return bool(self.azure_openai_endpoint and self.azure_openai_api_key)
+        # Configured when we have an endpoint and either an API key or the
+        # ability to fetch an Entra token via managed identity.
+        return bool(
+            self.azure_openai_endpoint
+            and (self.azure_openai_api_key or self.use_managed_identity)
+        )
+
+    @property
+    def llm_uses_aad(self) -> bool:
+        return bool(
+            self.azure_openai_endpoint
+            and not self.azure_openai_api_key
+            and self.use_managed_identity
+        )
 
     @property
     def mini_deployment(self) -> str:
@@ -82,7 +111,25 @@ class Settings(BaseSettings):
 
     @property
     def cosmos_configured(self) -> bool:
-        return bool(self.cosmos_endpoint and self.cosmos_key)
+        return bool(
+            self.cosmos_endpoint and (self.cosmos_key or self.use_managed_identity)
+        )
+
+    @property
+    def cosmos_uses_aad(self) -> bool:
+        return bool(
+            self.cosmos_endpoint and not self.cosmos_key and self.use_managed_identity
+        )
+
+    @property
+    def servicebus_configured(self) -> bool:
+        return bool(self.servicebus_connection_string or self.servicebus_namespace)
+
+    @property
+    def servicebus_uses_aad(self) -> bool:
+        return bool(
+            self.servicebus_namespace and not self.servicebus_connection_string
+        )
 
     @property
     def cors_origin_list(self) -> list[str]:

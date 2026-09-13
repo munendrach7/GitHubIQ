@@ -13,13 +13,14 @@ step. Falls back to a structured heuristic body when no LLM is configured.
 from __future__ import annotations
 
 import logging
-from concurrent.futures import ThreadPoolExecutor
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from ..compaction import compact_files
 from ..llm import invoke_json
 from ..prompts import render
 from ..scale import compute_scale
-from .state import GraphState
+from .state import GraphState, check_cancelled
 
 logger = logging.getLogger("githubiq.deepdive")
 
@@ -77,6 +78,7 @@ def run(state: GraphState) -> dict:
     arch = state["architecture"]
     prefs = state["preferences"]
     reporter.update("Deep-Dive", "running", "Writing an in-depth section per component")
+    check_cancelled(reporter)
 
     scale = compute_scale(ctx.meta.file_count, getattr(prefs, "depth", None))
     components = list(brief.components or [])[: max(1, scale.max_deepdives)]
@@ -134,13 +136,44 @@ def run(state: GraphState) -> dict:
 
     deepdives: dict[str, str] = {}
     if components:
+        # Pre-compute the heuristic bodies so any component that times out, errors,
+        # or gets cancelled still ends up with a real (if shorter) section.
+        fallbacks = {
+            c.name: _heuristic_body(c, *_connections(arch, c.name)) for c in components
+        }
         workers = min(_MAX_WORKERS, len(components))
-        with ThreadPoolExecutor(max_workers=workers) as ex:
-            for name, body in ex.map(work, components):
+        deadline = time.monotonic() + max(30, scale.deepdive_deadline)
+        ex = ThreadPoolExecutor(max_workers=workers)
+        try:
+            futures = {ex.submit(work, c): c for c in components}
+            for fut in as_completed(futures):
+                # Honour a user cancellation as soon as one lands.
+                if reporter.cancelled():
+                    break
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    logger.warning(
+                        "Deep-Dive deadline (%ss) reached; filling remainder heuristically",
+                        scale.deepdive_deadline,
+                    )
+                    break
+                comp = futures[fut]
+                try:
+                    name, body = fut.result(timeout=max(1, remaining))
+                except Exception as exc:  # noqa: BLE001 - degrade to heuristic body
+                    logger.error("Deep-Dive failed for %s: %s", comp.name, exc)
+                    name, body = comp.name, fallbacks[comp.name]
                 deepdives[name] = body
                 reporter.update(
                     "Deep-Dive", "running", f"deep dive: {name} ({len(deepdives)})"
                 )
+        finally:
+            # Never block the pipeline on stragglers — abandon them and move on.
+            ex.shutdown(wait=False, cancel_futures=True)
+
+        # Guarantee coverage: any component we didn't finish gets its heuristic body.
+        for c in components:
+            deepdives.setdefault(c.name, fallbacks[c.name])
 
     reporter.update("Deep-Dive", "done", f"{len(deepdives)} component deep dives")
     return {"component_deepdives": deepdives}

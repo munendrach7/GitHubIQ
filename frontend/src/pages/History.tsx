@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import TopBar from "../components/TopBar";
 import { listAnalyses } from "../api";
+import { useAuth } from "../AuthContext";
 import type { AnalysisSummary } from "../types";
 
 function formatDate(ts: number): string {
@@ -13,6 +14,8 @@ function formatDate(ts: number): string {
 
 export default function History() {
   const nav = useNavigate();
+  const { user } = useAuth();
+  const isAdmin = !!user?.is_admin;
   const [items, setItems] = useState<AnalysisSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
@@ -25,21 +28,33 @@ export default function History() {
   }, []);
 
   const filtered = items.filter(
-    (h) => !q || `${h.repo_owner}/${h.repo_name} ${h.repo_url}`.toLowerCase().includes(q.toLowerCase())
+    (h) =>
+      !q ||
+      `${h.repo_owner}/${h.repo_name} ${h.repo_url} ${h.owner || ""}`
+        .toLowerCase()
+        .includes(q.toLowerCase())
   );
 
   return (
     <>
-      <TopBar sub="your saved guides" />
+      <TopBar sub={isAdmin ? "all users' guides" : "your saved guides"} />
 
       <div className="page-head">
-        <h2>🕘 My guides</h2>
-        <p>Every guide you've generated — pick up where you left off.</p>
+        <h2>🕘 {isAdmin ? "All guides" : "My guides"}</h2>
+        <p>
+          {isAdmin
+            ? "As admin you can see every user's generated guides."
+            : "Every guide you've generated — pick up where you left off."}
+        </p>
       </div>
 
       <div className="glass repo-input" style={{ marginBottom: 20 }}>
         <span className="mono muted">🔍</span>
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search your guides by repo…" />
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder={isAdmin ? "Search guides by repo or user…" : "Search your guides by repo…"}
+        />
         <button className="btn accent" onClick={() => nav("/")}>🧠 New guide</button>
       </div>
 
@@ -58,6 +73,7 @@ export default function History() {
                 </div>
                 <div className="history-meta">
                   <span className="dim">{formatDate(h.created_at)}</span>
+                  {isAdmin && h.owner && <span className="tag">👤 {h.owner}</span>}
                   {h.llm_powered && <span className="tag green">AI</span>}
                 </div>
                 <div className="history-open">{done ? "Open guide →" : "View progress →"}</div>

@@ -18,7 +18,7 @@ from ..models import (
 )
 from ..storage import Store
 from . import architect, dataflow, deepdive, presenter, researcher, schema, tutor
-from .state import GraphState, ProgressReporter
+from .state import GraphState, PipelineCancelled, ProgressReporter, check_cancelled
 
 logger = logging.getLogger("githubiq.orchestrator")
 
@@ -216,18 +216,33 @@ def _compose(state: GraphState) -> dict:
     return {"guide": guide}
 
 
+def _guard(fn):
+    """Wrap a graph node so cancellation is checked before it runs.
+
+    Gives us a cancellation checkpoint at every node boundary; combined with the
+    in-loop checks inside the Deep-Dive agent, a cancelled run stops promptly
+    instead of grinding through the remaining agents.
+    """
+    def wrapped(state: GraphState) -> dict:
+        check_cancelled(state["reporter"])
+        return fn(state)
+
+    wrapped.__name__ = getattr(fn, "__name__", "node")
+    return wrapped
+
+
 def build_graph():
     from langgraph.graph import END, START, StateGraph
 
     g = StateGraph(GraphState)
-    g.add_node("agent_researcher", researcher.run)
-    g.add_node("agent_architect", architect.run)
-    g.add_node("agent_schema", schema.run)
-    g.add_node("agent_dataflow", dataflow.run)
-    g.add_node("agent_deepdive", deepdive.run)
-    g.add_node("agent_tutor", tutor.run)
-    g.add_node("agent_presenter", presenter.run)
-    g.add_node("compose", _compose)
+    g.add_node("agent_researcher", _guard(researcher.run))
+    g.add_node("agent_architect", _guard(architect.run))
+    g.add_node("agent_schema", _guard(schema.run))
+    g.add_node("agent_dataflow", _guard(dataflow.run))
+    g.add_node("agent_deepdive", _guard(deepdive.run))
+    g.add_node("agent_tutor", _guard(tutor.run))
+    g.add_node("agent_presenter", _guard(presenter.run))
+    g.add_node("compose", _guard(_compose))
 
     g.add_edge(START, "agent_researcher")
     # fan-out from the researcher: architect, schema and tutor run in parallel
@@ -247,9 +262,29 @@ def build_graph():
     return g.compile()
 
 
-def run_pipeline(result: AnalysisResult, ctx, store: Store) -> AnalysisResult:
-    """Execute the multi-agent graph, mutating and persisting ``result``."""
-    reporter = ProgressReporter(result, store)
+def run_pipeline(
+    result: AnalysisResult, ctx, store: Store, cancel_event=None
+) -> AnalysisResult:
+    """Execute the multi-agent graph, mutating and persisting ``result``.
+
+    ``cancel_event`` is an optional in-process :class:`threading.Event` for the
+    background-task path. Regardless, a store-backed check re-reads the persisted
+    ``cancel_requested`` flag so a cancel issued from the API reaches a worker
+    running in a different process.
+    """
+    def _flag_check() -> bool:
+        fresh = store.get(result.id)
+        return bool(fresh and fresh.cancel_requested)
+
+    reporter = ProgressReporter(
+        result, store, cancel_event=cancel_event, cancel_check=_flag_check
+    )
+
+    # Respect a cancel that arrived before we even started.
+    if reporter.cancelled():
+        reporter.cancel()
+        return reporter.result
+
     result.status = AnalysisStatus.running
     result.llm_powered = llm_available()
     result.repo = ctx.meta
@@ -263,6 +298,10 @@ def run_pipeline(result: AnalysisResult, ctx, store: Store) -> AnalysisResult:
     }
     try:
         final = graph.invoke(initial)
+    except PipelineCancelled:
+        logger.info("Pipeline cancelled for %s", result.id)
+        reporter.cancel()
+        return reporter.result
     except Exception as exc:  # noqa: BLE001
         logger.exception("Pipeline failed")
         reporter.fail(str(exc))

@@ -32,6 +32,9 @@ class Store:
     def list_analyses(self, owner: str) -> list[AnalysisResult]:  # pragma: no cover
         raise NotImplementedError
 
+    def list_all_analyses(self) -> list[AnalysisResult]:  # pragma: no cover
+        raise NotImplementedError
+
 
 class MemoryStore(Store):
     def __init__(self) -> None:
@@ -63,13 +66,29 @@ class MemoryStore(Store):
         results = [AnalysisResult.model_validate(d) for d in docs]
         return sorted(results, key=lambda r: r.created_at, reverse=True)
 
+    def list_all_analyses(self) -> list[AnalysisResult]:
+        with self._lock:
+            docs = list(self._data.values())
+        results = [AnalysisResult.model_validate(d) for d in docs]
+        return sorted(results, key=lambda r: r.created_at, reverse=True)
+
 
 class CosmosStore(Store):
     def __init__(self) -> None:
         from azure.cosmos import CosmosClient, PartitionKey
 
         settings = get_settings()
-        client = CosmosClient(settings.cosmos_endpoint, credential=settings.cosmos_key)
+        if settings.cosmos_key:
+            client = CosmosClient(
+                settings.cosmos_endpoint, credential=settings.cosmos_key
+            )
+        else:
+            # Keyless: authenticate with the managed identity (Entra RBAC).
+            from .azure_ident import get_credential
+
+            client = CosmosClient(
+                settings.cosmos_endpoint, credential=get_credential()
+            )
         db = client.create_database_if_not_exists(settings.cosmos_database)
         self._container = db.create_container_if_not_exists(
             id=settings.cosmos_container,
@@ -115,6 +134,13 @@ class CosmosStore(Store):
             query=query,
             parameters=[{"name": "@owner", "value": owner}],
             enable_cross_partition_query=True,
+        )
+        return [AnalysisResult.model_validate(d) for d in items]
+
+    def list_all_analyses(self) -> list[AnalysisResult]:
+        query = "SELECT * FROM c ORDER BY c.created_at DESC"
+        items = self._container.query_items(
+            query=query, enable_cross_partition_query=True
         )
         return [AnalysisResult.model_validate(d) for d in items]
 

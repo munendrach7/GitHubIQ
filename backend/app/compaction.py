@@ -38,10 +38,10 @@ SUMMARY_SYSTEM = (
 
 # Size of a single file-chunk fed to the cheap model during the map phase.
 _CHUNK_CHARS = 48_000
-# Characters of each file included when reducing a group (keeps group calls small).
-_GROUP_FILE_SLICE = 8_000
-# Target size of one group digest during the reduce phase.
-_GROUP_TARGET = 1_500
+# Hard ceiling on cheap-LLM summary calls per compaction pass. This is the key
+# guard against a huge assigned file-set hanging an agent with hundreds of
+# sequential LLM calls — coverage is still preserved via structural fallback.
+_MAX_LLM_CALLS = 8
 
 
 def _resolve(ctx, paths: list[str]) -> tuple[list[tuple[str, str]], list[str]]:
@@ -77,15 +77,38 @@ def _raw_block(path: str, body: str, limit: int) -> str:
     return f"### FILE: {path} ({len(body):,} chars)\n{snippet}"
 
 
-def _summarize_file(path: str, body: str, focus: str, target_chars: int) -> str:
-    """Map phase: condense one (possibly large) file into a faithful digest."""
+def _structural_block(path: str, body: str, target_chars: int) -> str:
+    """No-LLM fallback: keep a head+tail slice so the file is still represented."""
+    if len(body) <= target_chars:
+        return f"### FILE (excerpt): {path} ({len(body):,} chars)\n{body}"
+    head = body[: max(1, target_chars * 2 // 3)]
+    tail = body[-(target_chars // 3):]
+    return (
+        f"### FILE (excerpt): {path} ({len(body):,} chars, head+tail shown)\n"
+        f"{head}\n... [middle omitted] ...\n{tail}"
+    )
+
+
+def _summarize_file(
+    path: str, body: str, focus: str, target_chars: int, max_calls: int
+) -> tuple[str, int]:
+    """Map phase: condense one file into a faithful digest using <= ``max_calls``
+    cheap-LLM calls. Returns ``(block, calls_used)``."""
     if len(body) <= _CHUNK_CHARS:
         chunks = [body]
     else:
         chunks = [body[i : i + _CHUNK_CHARS] for i in range(0, len(body), _CHUNK_CHARS)]
 
+    truncated_chunks = False
+    if len(chunks) > max_calls:
+        # Spread the allowed calls across the file so we still see head..tail.
+        step = len(chunks) / max_calls
+        chunks = [chunks[min(len(chunks) - 1, int(i * step))] for i in range(max_calls)]
+        truncated_chunks = True
+
     per_chunk = max(400, target_chars // len(chunks))
     partials: list[str] = []
+    calls_used = 0
     for idx, chunk in enumerate(chunks):
         user = (
             f"FILE: {path} (chunk {idx + 1} of {len(chunks)})\n"
@@ -101,57 +124,29 @@ def _summarize_file(path: str, body: str, focus: str, target_chars: int) -> str:
             max_tokens=min(1500, per_chunk // 2 + 300),
             cheap=True,
         )
+        calls_used += 1
         if out:
             partials.append(out.strip())
 
     digest = " ".join(partials).strip()
     if not digest:  # LLM unavailable / failed → structural head+tail fallback
-        head = body[: max(1, target_chars * 2 // 3)]
-        tail = body[-(target_chars // 3):] if len(body) > target_chars else ""
-        digest = head + ("\n...\n" + tail if tail else "")
+        return _structural_block(path, body, target_chars), calls_used
     digest = digest[: int(target_chars * 1.2)]
-    return f"### FILE (digest): {path} ({len(body):,} chars condensed)\n{digest}"
-
-
-def _grouped_reduce(
-    ctx, resolved: list[tuple[str, str]], missing: list[str], *, budget: int, focus: str
-) -> str:
-    """Reduce phase: too many files to summarise individually — group them."""
-    max_groups = max(1, budget // (_GROUP_TARGET + 120))
-    n_groups = min(max_groups, len(resolved))
-    groups: list[list[tuple[str, str]]] = [[] for _ in range(n_groups)]
-    for i, item in enumerate(resolved):
-        groups[i % n_groups].append(item)
-
-    blocks: list[str] = []
-    for group in groups:
-        names = ", ".join(p for p, _ in group)
-        combined = "\n\n".join(
-            f"FILE: {p}\n{b[:_GROUP_FILE_SLICE]}" for p, b in group
-        )
-        user = (
-            f"Summarise the following {len(group)} source files together into "
-            f"<= {_GROUP_TARGET} characters. "
-            + (f"FOCUS: {focus} " if focus else "")
-            + "Name EACH file and give its role plus key symbols and connections. "
-            f"Files: {names}\n\n{combined}"
-        )
-        out = invoke_text(SUMMARY_SYSTEM, user, default="", max_tokens=1200, cheap=True)
-        if not out:  # fallback still names every file so coverage is preserved
-            out = " | ".join(f"{p}: {b[:180].strip()}" for p, b in group)
-        blocks.append(
-            f"### GROUP DIGEST ({len(group)} files: {names})\n"
-            + out.strip()[: int(_GROUP_TARGET * 1.3)]
-        )
-    if missing:
-        blocks.append(_missing_note(missing))
-    return "\n\n".join(blocks)
+    note = " (partial sampling)" if truncated_chunks else ""
+    return (
+        f"### FILE (digest{note}): {path} ({len(body):,} chars condensed)\n{digest}",
+        calls_used,
+    )
 
 
 def compact_files(
     ctx, paths: list[str], *, budget: int, focus: str = "", per_file_raw: int = 26_000
 ) -> str:
     """Return context covering EVERY resolvable path in ``paths`` within ``budget``.
+
+    Coverage is guaranteed: every resolved file emits a named block (raw, digest,
+    or structural excerpt). Cost/latency are bounded: at most ``_MAX_LLM_CALLS``
+    cheap-LLM calls are made regardless of how many files were assigned.
 
     Returns ``""`` when no path resolves, so callers keep their existing
     ``or ctx.sampled_sources(...)`` fallback.
@@ -170,21 +165,31 @@ def compact_files(
         return "\n\n".join(blocks)
 
     n = len(resolved)
-    # Fair per-file share, leaving ~20% headroom for headers/digest overshoot.
-    per = max(1_200, int(budget * 0.8) // n)
+    # Fair per-file share, leaving headroom for headers/digest overshoot.
+    per = max(800, int(budget * 0.85) // n)
 
-    # Too many files to give each a usable share → group & reduce.
-    if per <= 1_200 and n * per > budget:
-        logger.info("Compaction: grouped-reduce over %d files (budget=%d)", n, budget)
-        return _grouped_reduce(ctx, resolved, missing, budget=budget, focus=focus)
+    logger.info(
+        "Compaction: map over %d files (budget=%d, per=%d, <=%d LLM calls)",
+        n, budget, per, _MAX_LLM_CALLS,
+    )
 
-    logger.info("Compaction: per-file map over %d files (budget=%d)", n, budget)
-    blocks: list[str] = []
-    for p, b in resolved:
+    # Summarise the largest files with the LLM first (best value per call); the
+    # rest fall back to structural excerpts once the call budget is exhausted.
+    order = sorted(range(n), key=lambda i: len(resolved[i][1]), reverse=True)
+    blocks_by_index: dict[int, str] = {}
+    calls_left = _MAX_LLM_CALLS
+    for i in order:
+        p, b = resolved[i]
         if len(b) <= min(per, per_file_raw):
-            blocks.append(_raw_block(p, b, per))
+            blocks_by_index[i] = _raw_block(p, b, per)
+        elif calls_left > 0:
+            block, used = _summarize_file(p, b, focus, per, max_calls=calls_left)
+            blocks_by_index[i] = block
+            calls_left -= used
         else:
-            blocks.append(_summarize_file(p, b, focus, per))
+            blocks_by_index[i] = _structural_block(p, b, per)
+
+    blocks = [blocks_by_index[i] for i in range(n)]
     if missing:
         blocks.append(_missing_note(missing))
     return "\n\n".join(blocks)
